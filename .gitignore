@@ -1,0 +1,9 @@
+_images/Thumbs.db
+_notes
+_psd
+node_modules
+*.sass-cache*
+*.db
+.gitattributes
+.errordocs
+sftp-config.json
