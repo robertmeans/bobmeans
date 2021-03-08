@@ -304,6 +304,13 @@ body {
   font-size: 16px;
   transition: all 0.3s ease;
 }
+#wrapper #contact-wrapper form#contactForm input#name,
+#wrapper #contact-wrapper form#contactForm input#email,
+#wrapper #contact-wrapper form#contactForm textarea#comments {
+  padding: 0.5em;
+  font-size: 18px;
+  line-height: 1.2em;
+}
 #wrapper #contact-wrapper form#contactForm input#send {
   display: inline-block;
   float: left;
@@ -311,13 +318,14 @@ body {
   max-width: 200px;
   padding: 15px 20px;
   margin: 10px 0;
-  font-size: 0.9em;
+  font-size: 1em;
   border: 1px solid #233851;
-  background: #ccc;
-  color: #000;
+  background-color: #82c33a;
+  color: #fff;
+  cursor: pointer;
 }
 #wrapper #contact-wrapper form#contactForm input#send:hover {
-  background: #565656;
+  background-color: #0099cc;
   color: #fff;
 }
 #wrapper #contact-wrapper form#contactForm input#send:active, #wrapper #contact-wrapper form#contactForm input#send:focus {
@@ -326,6 +334,44 @@ body {
 }
 #wrapper #contact-wrapper form#contactForm input#send:visited {
   background: #ccc;
+}
+#wrapper #contact-wrapper form#contactForm #msg {
+  margin-top: 0.75em;
+  width: 100%;
+  line-height: 1.5em;
+  text-align: left;
+}
+#wrapper #contact-wrapper form#contactForm #msg .alert-warning {
+  margin-bottom: 0.5em;
+  border-radius: 5px;
+  padding: 0.75em;
+  font-size: 1em;
+  color: #313131;
+  background-color: #ffdddd;
+  border: 1px solid #ff5a5a;
+}
+#wrapper #contact-wrapper form#contactForm #msg .alert-success {
+  margin-bottom: 0.5em;
+  border-radius: 5px;
+  padding: 0.75em;
+  font-size: 1em;
+  color: #fff;
+  background-color: #82c33a;
+  border: 1px solid #45661f;
+}
+#wrapper #contact-wrapper form#contactForm .click-box-03 {
+  width: 50%;
+  font-size: 1em;
+  padding: 1em;
+  margin: 1.5em auto 0;
+  background-color: #000;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.2s ease;
+  border: 1px solid #fff;
+}
+#wrapper #contact-wrapper form#contactForm .click-box-03:hover {
+  background-color: rgba(255, 255, 255, 0.2);
 }
 #wrapper #contact-wrapper button#confirm {
   font-size: 0.9em;
