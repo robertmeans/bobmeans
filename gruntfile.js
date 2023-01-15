@@ -42,7 +42,7 @@ module.exports = function(grunt) {
 				expanded: true, 
 				flatten: true,
 				src: '*.css',
-				dest: ''
+				dist: ''
 			}
 		},
 
