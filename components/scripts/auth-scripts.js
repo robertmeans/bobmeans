@@ -171,7 +171,7 @@ $(document).ready(function() {
             if (current_loc.indexOf("localhost") > -1) {
               window.location.replace("http://localhost/bobmeans");
             } else {
-              window.location.replace("https://bobmeans.com");
+              window.location.replace("https://bobmeans.com/o");
             }
           } else {
             $('#session-msg').html('');
@@ -291,7 +291,7 @@ $(document).ready(function() {
             if (current_loc.indexOf("localhost") > -1) {
               window.location.replace("http://localhost/bobmeans");
             } else {
-              window.location.replace("https://bobmeans.com");
+              window.location.replace("https://bobmeans.com/o");
             }
           } else {
             $('#login-alert').addClass('show ' + response.class);

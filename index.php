@@ -12,18 +12,10 @@ if (isset($_GET['reset-token'])) {
 }
 
 if (show_login()) {
-  require '_includes/header.php';
   require '_insert-auth.php';
-  require '_includes/footer.php';
   exit;
 }
 
 /* we're logged in! */
-require '_includes/header.php';
-require '_includes/nav.php'; ?>
+require 'homepage.php'; 
 
-<div class="hmmsg">
-  <a href="logout.php">Logout</a>
-</div>
-
-<?php require '_includes/footer.php'; ?>

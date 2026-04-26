@@ -216,6 +216,7 @@ if (isset($_POST['login_routine'])) {
             $_SESSION['email']    = $user['email'];
             $_SESSION['verified'] = $user['verified'];
             $_SESSION['token']    = $user['token'];
+            $_SESSION['loggedin'] = 'true';
 
             unset($_SESSION['login-hold']); /* prevents login on refresh if just verified */
 
@@ -319,12 +320,6 @@ if (isset($_POST['forgot_password_routine'])) {
       'class' => $class
   ]);
 } /* 'forgot_password_routine' */
-
-
-
-
-
-
 
 
 

@@ -39,4 +39,4 @@
   <script src="_scripts/jquery_1-12-1_ui_min.js"></script>
 
 </head>
-<body>
+<body <?php if (isset($_SESSION['loggedin'])) { ?>class="lbbc"<?php } ?>>

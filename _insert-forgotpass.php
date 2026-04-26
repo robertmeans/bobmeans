@@ -1,4 +1,3 @@
-
       <h1>Reset Password</h1>
 
       <?php require '_includes/auth-comm.php'; ?>
@@ -23,4 +22,3 @@
         </form>
 
       </div><!-- #formcon -->
-

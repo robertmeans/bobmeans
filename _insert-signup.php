@@ -1,4 +1,3 @@
-
       <h1>Create Account</h1>
 
       <?php require '_includes/auth-comm.php'; ?>
@@ -33,4 +32,3 @@
         </form>
 
       </div><!-- #formcon -->
-

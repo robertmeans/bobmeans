@@ -1,5 +1,3 @@
-<?php // require_once 'config/initialize.php'; ?>
-
       <h1>Create New Password</h1>
 
       <?php require '_includes/auth-comm.php'; ?>
@@ -28,4 +26,3 @@
         </form>
 
       </div><!-- #formcon -->
-
