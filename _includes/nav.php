@@ -1,12 +1,48 @@
 <?php if (file_exists("_errors.txt")) { $fileExists = true; } else { $fileExists = false; } ?>
 
-<?php if (bob() && ($fileExists && filesize("_errors.txt") > 0)) { ?>
-  <div class="phperror on" data-role="error-notification">
-    <a class="per" href="_errors.txt" target="_blank"><i class="fas far fa-exclamation-circle"></i></a>
+<nav class="navigation">
+
+  <?php if (bob() && ($fileExists && filesize("_errors.txt") > 0)) { ?>
+    <div class="phperror on" data-role="error-notification">
+      <a class="per" href="_errors.txt" target="_blank"><i class="fas far fa-exclamation-circle"></i></a>
+    </div>
+   <?php } else { ?>
+    <div class="phperror" data-role="error-notification"></div> 
+  <?php } ?>
+
+  <div class="top-nav">
+    <div class="menu-basket">
+      <div class="bar-box">
+        <span class="bars"></span>
+      </div>
+    </div>
   </div>
- <?php } else { ?>
-  <div class="phperror" data-role="error-notification"></div> 
-<?php } ?>
+
+</nav>
+<div id="side-nav-bkg">
+  <div id="side-nav" class="sidenav">
+
+    <div id="sidenav-wrapper">
+    
+      <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
+
+    </div>
+
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 <?php /* for my eyes only - error reporting */ 
 if (bob()) { ?>
