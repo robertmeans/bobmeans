@@ -16,12 +16,10 @@ if (isset($_GET['filename_of_errors'])) {
 require_once 'config/initialize.php';
 
 if (is_post_request()) { /* closes at very bottom of page */
-
-/* BEGIN: reset errors (me only) */
-if (isset($_POST['process_reset_errors'])) {
-  $filename = "_errors.txt";
-  if (unlink($filename)) {
-    echo 'ok';
+  if (isset($_POST['process_reset_errors'])) {
+    $filename = "_errors.txt";
+    if (unlink($filename)) {
+      echo 'ok';
     } else {
       echo 'nope';
     }
