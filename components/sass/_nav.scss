@@ -74,35 +74,6 @@
   transform: rotate(-45deg);
 }
 
-.phperror {
-  position: fixed;
-  top: 0;
-  margin-right: 52px;
-  max-width: 55px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  background-color: red;
-  color: #fff;
-  transition: all 0.2s ease;
-  a.per {
-    color: #fff;
-    padding: 0.5em .75em;
-    transition: all 0.2s ease;
-    &:hover {
-      padding-top: 0.75em;
-      background-color: red;
-    }
-  }
-  &.on {
-    border-style: none solid solid solid;
-    border-width: 0 1px 1px 1px;
-    border-color: rgba(255,255,255,0.6);
-    border-radius: 0px 0px 3px 3px;
-  }
-}
-
 #side-nav-bkg {
   z-index: 89;
   display: flex;
@@ -150,41 +121,6 @@
       background-color: rgba(255,255,255,0.5);
       color: #fff;
     }
-  }
-  a.nav-active {
-    cursor: default;
-    background-color: rgba(255,255,255,0.3);
-    color: #fff; 
-  }
-  a.closebtn {
-    width: 100%;
-    padding-left: 0.75em;
-    margin-bottom: 0.75em;
-    display: flex;
-    justify-content: flex-start;
-    cursor: pointer;
-    text-align: left;
-    .ctxt {
-      color: transparent;
-    }
-    i {
-      font-size: 1.5em;
-      transform: rotate(270deg);
-      animation: in .25s 2 linear;
-      transition: color 0.65s ease;
-    }
-    &:hover {
-      .ctxt {
-        color: rgba(0,0,0,0.9);
-      }
-       .ctd {
-        transition-delay: 0.5s;
-      } 
-      i {
-        color: #fff;
-        animation: out .5s 1 linear;
-      }
-    }
   } 
   a.login {
     i {
@@ -213,54 +149,51 @@
       color: #fff;
     }
   }
-
-
-
-
-  .err-on {
-    display: inline-block;
-    margin-top: 35px;
-    padding: 1em 0em 1em 1.5em;
-    font-size: 0.8em;
+}
+.phperror-tab {
+  display: none;
+  &.on {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.5em .75em;
+    position: fixed;
+    top: 0;
+    margin-right: 52px;
+    max-width: 55px;
+    background-color: red;
+    color: #fff;
+    border-style: none solid solid solid;
+    border-width: 0 1px 1px 1px;
+    border-color: rgba(255,255,255,0.6);
+    border-radius: 0px 0px 3px 3px;
+    transition: all 0.2s ease;
+  }
+  &:hover {
+    padding-top: 0.75em;
+  }
+  a {
+    color: #fff;
+  }
+}
+.phperror-link {
+  margin: 35px 0 3px;
+  padding: 1em 0em 1em 1.5em;
+  font-size: 0.8em;  
+  background-color: transparent;
+  cursor: default;
+  pointer-events: none;
+  &.on {
     color: #818181;
     background-color: rgba(255,215,0,0.6);
     color: #fff;
     background-color: #ff0000;
     cursor: pointer;
-    margin-bottom: 3px;
-    z-index: 101;
+    pointer-events: auto;
     transition: all 0.2s ease;
+    z-index:99999;
     &:hover {
       background-color: #ab0000;
     }
   }
-  .err-off {
-    display: inline-block;
-    margin-top: 35px;
-    padding: 1em 0em 1em 1.5em;
-    cursor: default;
-    pointer-events: none;
-    margin-bottom: 3px;
-    background-color: transparent;
-  }
-
-  a.cc-x {
-    cursor: pointer;
-    font-size: 0.75em;
-    margin-top: 2em;
-    border-top: 1px dashed rgba(255,255,255,0.2);
-  }
-  a.cc-x.eotw {
-    margin-top: 0;
-    margin-bottom: 2em;
-  }
-  a.cc-x.ial {
-    margin-top: -2em;
-    margin-bottom: 0em;
-    &.nav-active {
-      cursor: default;
-    }
-  }
-
-
 }

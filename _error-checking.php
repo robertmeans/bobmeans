@@ -16,12 +16,18 @@ if (isset($_GET['filename_of_errors'])) {
 require_once 'config/initialize.php';
 
 if (is_post_request()) { /* closes at very bottom of page */
+
   if (isset($_POST['process_reset_errors'])) {
     $filename = "_errors.txt";
     if (unlink($filename)) {
-      echo 'ok';
+      $signal = 'ok';
     } else {
-      echo 'nope';
+      $signal = 'nope';
     }
+
+    echo json_encode([
+      'signal' => $signal,
+    ]);
   }
+  
 }

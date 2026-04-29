@@ -3,12 +3,16 @@
 <nav class="navigation">
 
   <?php if (bob() && ($fileExists && filesize("_errors.txt") > 0)) { ?>
-    <div class="phperror on" data-role="error-notification">
+
+    <div class="phperror-tab on" data-role="error-notification">
       <a class="per" href="_errors.txt" target="_blank"><i class="fas far fa-exclamation-circle"></i></a>
     </div>
+
    <?php } else { ?>
-    <div class="phperror" data-role="error-notification"></div> 
-  <?php } ?>
+
+    <div class="phperror-tab" data-role="error-notification">&nbsp;</div>
+
+   <?php } ?>
 
   <div class="top-nav">
     <div class="menu-basket">
@@ -29,9 +33,15 @@
 
       <?php if (bob()) { ?>
         <?php if ($fileExists && filesize("_errors.txt") > 0) { ?>
-          <div class="er err-on" data-role="error-reset"><div class="del-err"><i class="far fas fa-minus-circle"></i> Reset Errors</div></div>
+
+          <div class="phperror-link on" data-role="error-reset">
+            <i class="far fas fa-minus-circle"></i> Reset Errors
+          </div>
+
         <?php } else { ?>
-          <div class="er err-off" data-role="error-reset">&nbsp;</div>
+
+          <div class="phperror-link" data-role="error-reset">&nbsp;</div>
+
         <?php } ?>
       <?php } ?>
 
@@ -58,25 +68,17 @@ if (bob()) { ?>
         success: function(response) {
           if (response === "File is not empty") {
 
-            $(".phperror").addClass("on");
-            $('div[data-role=error-notification]').html('<a class="per" href="_errors.txt" target="_blank"><i class="fas far fa-exclamation-circle"></i></a>');
+            /* turn everything on */
+            $(".phperror-tab").addClass("on");
+            $(".phperror-tab").html('<a class="per" href="_errors.txt" target="_blank"><i class="fas far fa-exclamation-circle"></i></a>');
 
-            $("div[data-role=error-reset]").removeClass("err-off");
-            $("div[data-role=error-reset]").addClass("err-on");
-            $("div[data-role=error-reset]").html('<div class="del-err"><i class="far fas fa-minus-circle"></i> Reset Errors</div>');
+            $(".phperror-link").addClass("on");
+            $(".phperror-link").html('<i class="far fas fa-minus-circle"></i> Reset Errors');
 
-            console.log("File is not empty");
-          } else {
-
-            $(".phperror").removeClass("on");
-            $('div[data-role=error-notification]').html('');
-
-            $("div[data-role=error-reset]").removeClass('err-on');
-            $("div[data-role=error-reset]").addClass("err-off");
-            $("div[data-role=error-reset]").html('');
-
-            console.log("File is empty or does not exist");
           }
+
+
+
         }
       });
     }
@@ -94,7 +96,7 @@ if (bob()) { ?>
 
 
       $('#side-nav').on('click', '[data-role="error-reset"]', function(e) { 
-        console.log('you clicked error-reset');
+        // console.log('you clicked error-reset');
         e.preventDefault();
         e.stopPropagation();
 
@@ -106,21 +108,19 @@ if (bob()) { ?>
             process_reset_errors: 'key'
           },
           success: function(response) {
-            // console.log(response);
             if(response) {
-              // console.log(response);
-              if(response['popup_signal'] == 'ok') {
-                var url = window.location.href;
-                $('#themepopupurl').val(url);
 
-                setTimeout(function() {
-                  $("#theme-options").fadeIn(500);
-                  }, 750);
+              if(response['signal'] == 'ok') {
+                //alert('yoyoyoyoyo');
+                $(".phperror-tab").removeClass("on");
+                $(".phperror-tab").html('&nbsp;');
 
-                // $("#theme-options").show(); /* for testing/dev */
+                $(".phperror-link").removeClass("on");
+                $(".phperror-link").html('&nbsp;');
 
               } else {
-                console.log('file not deleted');
+
+                //console.log('file not deleted');
               }
             } 
           },
