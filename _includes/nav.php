@@ -28,32 +28,22 @@
 
     <div id="sidenav-wrapper">
 
-
       <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
 
       <?php if (bob()) { ?>
         <?php if ($fileExists && filesize("_errors.txt") > 0) { ?>
-
           <div class="phperror-link on" data-role="error-reset">
             <i class="far fas fa-minus-circle"></i> Reset Errors
           </div>
-
         <?php } else { ?>
-
           <div class="phperror-link" data-role="error-reset">&nbsp;</div>
-
         <?php } ?>
       <?php } ?>
-
-      
 
     </div>
 
   </div>
 </div>
-
-
-
 
 <?php /* for my eyes only - error reporting */ 
 if (bob()) { ?>
@@ -76,9 +66,6 @@ if (bob()) { ?>
             $(".phperror-link").html('<i class="far fas fa-minus-circle"></i> Reset Errors');
 
           }
-
-
-
         }
       });
     }
@@ -88,12 +75,6 @@ if (bob()) { ?>
         checkFileExists(error_location);
         // console.log('yo');
       }, 3000);
-
-
-
-
-
-
 
       $('#side-nav').on('click', '[data-role="error-reset"]', function(e) { 
         // console.log('you clicked error-reset');
@@ -119,7 +100,6 @@ if (bob()) { ?>
                 $(".phperror-link").html('&nbsp;');
 
               } else {
-
                 //console.log('file not deleted');
               }
             } 
