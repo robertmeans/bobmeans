@@ -18,14 +18,18 @@
   cursor: pointer;
   background-color: #4b75aa;
   color: #fff;
+
   padding: 0.5em 1em;
+  margin-top: -1.75em;
+
   border-style: none solid solid solid;
   border-width: 0 1px 1px 1px;
   border-color: rgba(255,255,255,0.6);
   border-radius: 0px 0px 3px 3px;
   transition: all 0.2s ease;
   &:hover {
-    padding-top: 0.75em;
+    margin-top: 0;
+    // padding-top: 0.75em;
     background-color: #1f3879;
     color: #fff;
   }
@@ -159,7 +163,11 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 0.5em .75em;
+
+    
+    margin-top: -30px;
+
+
     position: fixed;
     top: 0;
     margin-right: 52px;
@@ -173,9 +181,11 @@
     transition: all 0.2s ease;
   }
   &:hover {
-    padding-top: 0.75em;
+    margin-top: 0;
+    // padding-top: 0.75em;
   }
   a {
+    padding: 9px 10px;
     color: #fff;
   }
 }
