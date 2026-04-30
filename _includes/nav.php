@@ -28,8 +28,6 @@
 
     <div id="sidenav-wrapper">
 
-      <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
-
       <?php if (bob()) { ?>
         <?php if ($fileExists && filesize("_errors.txt") > 0) { ?>
           <div class="phperror-link on" data-role="error-reset">
@@ -39,6 +37,8 @@
           <div class="phperror-link" data-role="error-reset">&nbsp;</div>
         <?php } ?>
       <?php } ?>
+
+      <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
 
     </div>
 
@@ -65,6 +65,9 @@ if (bob()) { ?>
             $(".phperror-link").addClass("on");
             $(".phperror-link").html('<i class="far fas fa-minus-circle"></i> Reset Errors');
 
+          } else {
+            $(".phperror-tab").removeClass("on");
+            $(".phperror-link").removeClass("on");
           }
         }
       });
@@ -92,7 +95,6 @@ if (bob()) { ?>
             if(response) {
 
               if(response['signal'] == 'ok') {
-                //alert('yoyoyoyoyo');
                 $(".phperror-tab").removeClass("on");
                 $(".phperror-tab").html('&nbsp;');
 

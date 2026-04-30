@@ -35,8 +35,16 @@
 
   <link rel="stylesheet" href="style.css?<?php echo time(); ?>" type="text/css">
 
+  <?php /*
   <script src="_scripts/jquery-3.5.1.min.js"></script>
   <script src="_scripts/jquery_1-12-1_ui_min.js"></script>
+  */ ?>
+
+  <?php if (WWW === 'dev') { ?>
+    <script src="_scripts/jquery-4.0.0.min.js"></script>
+  <?php } else { ?>
+    <script src="https://code.jquery.com/jquery-4.0.0.min.js" integrity="sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=" crossorigin="anonymous"></script>
+  <?php } ?>
 
 </head>
 <body <?php if (isset($_SESSION['loggedin'])) { ?>class="lbbc"<?php } ?>>
