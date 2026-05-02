@@ -48,3 +48,4 @@
 
 </head>
 <body <?php if (isset($_SESSION['loggedin'])) { ?>class="lbbc"<?php } ?>>
+  <div class="main-wrap"><?php /* .main-wrap open */ ?>

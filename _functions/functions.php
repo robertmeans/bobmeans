@@ -1,11 +1,10 @@
 <?php
 
-function show_login() {
+function verify_loggedin() {
   if (!isset($_SESSION['verified']) || isset($_SESSION['login-hold'])) {
-    return true;
-  } else { 
-    return false; 
-  }  
+    require '_insert-auth.php';
+    exit;
+  } 
 }
 
 

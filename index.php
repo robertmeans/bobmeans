@@ -11,10 +11,7 @@ if (isset($_GET['reset-token'])) {
   resetPassword($resetToken);
 }
 
-if (show_login()) {
-  require '_insert-auth.php';
-  exit;
-}
+verify_loggedin();
 
 /* we're logged in! */
 require 'homepage.php'; 

@@ -13,5 +13,7 @@ if (!isset($_SESSION['loggedin'])) { ?>
   <script src="http://localhost:35729/livereload.js"></script>
 <?php } ?>
 
+
+  </div><?php /* .main-wrap close */ ?>
 </body>
 </html>

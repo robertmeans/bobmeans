@@ -1,0 +1,109 @@
+.intake-form {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+}
+.funding-form {
+  display: flex;
+  flex-direction: column;
+  width: 500px;
+  color: #fff;
+}
+.billing-schedule {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  color: #fff;
+}
+.inner-links {
+  display: flex;
+  align-items: center;
+  margin-top: 1em;
+  a {
+    color: #fff;
+    text-decoration: none;
+    margin: 1em;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+.two-col {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 1em;
+  .row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 48%;
+  }
+}
+.row.standalone {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.paypal-running-balance {
+  margin-top: 1em;
+}
+input,
+select {
+  font-size: 1em;
+  padding: 0.5em;
+}
+input.memo {
+  height: 4em;
+}
+.checks {
+  display: flex;
+  margin-top: 1em;
+  label {
+    margin: 0 1.5em;
+  }
+}
+button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1em 1.5em;
+  margin: 1em 0;
+  background-color: #376b7f;
+  border: 1px solid rgba(255,255,255,0.6);
+  transition: all 0.15s ease;
+  &:hover {
+    background-color: #214c5c;
+  }
+}
+.errors,
+.success {
+  display: flex;
+  margin: 1em 0;  
+  padding: 1em;
+  width: 100%;
+}
+.errors {
+  background-color: #c63d3d;
+}
+.success {
+  background-color: #2aa343;
+}
+table {
+  background-color: rgba(255,255,255,0.8);
+  color: #313131;
+  th, 
+  td {
+    padding: 0.5em 1em;
+  }
+  tr:nth-child(even) {
+    background-color: rgba(255,255,255,0.8);
+  }
+  thead {
+    background-color: #313131;
+    color: #fff;
+  }
+}
