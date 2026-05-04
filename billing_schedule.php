@@ -65,11 +65,12 @@ foreach ($rows as $row) {
       <thead>
         <tr>
           <th class="pay">&nbsp;</th>
-          <th>In Reserves</th>
+          
           <th>Billing Account</th>
           <th>Amount Due</th>
-          <th>Next Due Date</th>
-          <th>Paid From</th>
+          <th>Next Due</th>
+          <th>&nbsp;</th>
+          <th>In Reserves</th>
         </tr>
       </thead>
       <tbody>
@@ -92,9 +93,7 @@ foreach ($rows as $row) {
 
           </td>
 
-          <td><?php /* In Reserves */ ?>
-            $<?php echo number_format((float)$row['reserve_balance'], 2); ?>
-          </td>  
+           
 
           <td><?php /* Billing Account */ ?>
             <?php echo htmlspecialchars($row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
@@ -113,7 +112,7 @@ foreach ($rows as $row) {
           <td><?php /* Next Due Date */ ?>
             <?php
             $original = $row['next_due_date'];
-            $newDate = date("M d, Y", strtotime($original));
+            $newDate = date("m.d.y", strtotime($original));
             echo $newDate;
             ?>
           </td>
@@ -125,6 +124,10 @@ foreach ($rows as $row) {
               echo htmlspecialchars((string)$row['paid_from_account'], ENT_QUOTES, 'UTF-8');
             } ?>
           </td><?php /* Paid From */ ?>
+
+          <td><?php /* In Reserves */ ?>
+            $<?php echo number_format((float)$row['reserve_balance'], 2); ?>
+          </td> 
         </tr>
       <?php endforeach; ?>
 
