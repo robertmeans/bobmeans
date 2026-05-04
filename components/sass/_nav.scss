@@ -92,7 +92,10 @@
 #sidenav-wrapper {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  // height: 100%;
+  height: 100vh;
+  height: 100dvh;
+
   width: 300px;
   padding-top: 60px;
   i {
@@ -102,8 +105,11 @@
 .sidenav {
   width: 300px;
   min-height: 100vh;
+  height: 100dvh;
+  
   background-color: #232c24;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   transform: translateX(100%);
   transition: transform 0.5s ease;
   &.open {
@@ -140,11 +146,9 @@
     }
   }
   a.logout {
-    position: absolute;
-    bottom: 0;
     color: #818181;
     background-color: #000;
-    margin-top: 2em;    
+    margin-top: auto;/* this is what makes it stick to the bottom */   
     i {
       color: #c30808;
     }
