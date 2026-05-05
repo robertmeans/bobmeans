@@ -231,7 +231,7 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       <div class="two-col">
         <div class="row">
           <label for="billing_name">Billing Account Name</label>
-          <input type="text" id="billing_name" name="billing_name" value="<?php echo htmlspecialchars($billing_name, ENT_QUOTES, 'UTF-8'); ?>" required>
+          <input type="text" id="billing_name" name="billing_name" value="<?php echo htmlspecialchars($billing_name, ENT_QUOTES, 'UTF-8'); ?>" required autofocus>
         </div>
 
         <div class="row">

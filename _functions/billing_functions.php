@@ -112,22 +112,6 @@ function paypal_reserved_amount_for_bill(array $row, DateTime $today): float
 
 
 
-
-
-
-
-
-
-
-
-function add_months_to_date(string $date_string, int $months): string
-{
-  $date = new DateTime($date_string);
-  $date->setTime(0, 0, 0);
-  $date->modify('+' . $months . ' months');
-  return $date->format('Y-m-d');
-}
-
 function payment_amount_for_bill(array $bill, int $cycles_paid = 1): float
 {
   $cadence = (string)($bill['cadence'] ?? '');
@@ -142,19 +126,6 @@ function payment_amount_for_bill(array $bill, int $cycles_paid = 1): float
   }
 
   return round($default_amount * $cycles_paid, 2);
-}
-
-function months_to_advance_for_bill(array $bill, int $cycles_paid = 1): int
-{
-  $renewal_term_months = isset($bill['renewal_term_months'])
-    ? (int)$bill['renewal_term_months']
-    : 1;
-
-  if ($renewal_term_months < 1) {
-    $renewal_term_months = 1;
-  }
-
-  return $renewal_term_months * $cycles_paid;
 }
 
 function load_billing_account(PDO $pdo_db, int $user_id, int $billing_account_id): ?array
@@ -197,10 +168,7 @@ function load_billing_account(PDO $pdo_db, int $user_id, int $billing_account_id
 
 function amount_due_after_reserve(array $row): float
 {
-  $base_amount = ((string)($row['cadence'] ?? '') === 'annual' && $row['annual_cost'] !== null)
-    ? (float)$row['annual_cost']
-    : (float)$row['default_amount'];
-
+  $base_amount = base_amount_for_bill($row);
   $reserve_balance = isset($row['reserve_balance']) ? (float)$row['reserve_balance'] : 0.00;
 
   $remaining = $base_amount - $reserve_balance;
@@ -399,3 +367,201 @@ function process_due_autopay_bills(PDO $pdo_db, int $user_id): array
     'skipped_count' => $skipped_count
   ];
 }
+
+function advance_next_due_date_by_cycles(array $bill, string $next_due_date, int $cycles): string
+{
+  if ($cycles < 1) {
+    return $next_due_date;
+  }
+
+  $months_to_advance = months_to_advance_for_bill($bill, $cycles);
+  return add_months_to_date($next_due_date, $months_to_advance);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function base_amount_for_bill(array $bill): float
+{
+  return round((float)($bill['default_amount'] ?? 0), 2);
+}
+
+function covered_cycles_from_reserve(array $bill, float $reserve_balance): int
+{
+  $base_amount = base_amount_for_bill($bill);
+
+  if ($base_amount <= 0) {
+    return 0;
+  }
+
+  return (int)floor($reserve_balance / $base_amount);
+}
+
+function pooled_paypal_balance(array $rows): float
+{
+  $total = 0.00;
+
+  foreach ($rows as $row) {
+    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+
+    if ($paid_from === 'paypal') {
+      $total += (float)($row['reserve_balance'] ?? 0);
+    }
+  }
+
+  return round($total, 2);
+}
+
+
+
+function add_months_to_date(string $date_string, int $months): string
+{
+  $date = new DateTime($date_string);
+  $date->setTime(0, 0, 0);
+  $date->modify(($months >= 0 ? '+' : '') . $months . ' months');
+  return $date->format('Y-m-d');
+}
+
+function months_to_advance_for_bill(array $bill, int $cycles = 1): int
+{
+  $renewal_term_months = isset($bill['renewal_term_months'])
+    ? (int)$bill['renewal_term_months']
+    : 1;
+
+  if ($renewal_term_months < 1) {
+    $renewal_term_months = 1;
+  }
+
+  return $renewal_term_months * $cycles;
+}
+
+function projected_actual_due_date(array $bill): string
+{
+  $next_due_date = (string)($bill['next_due_date'] ?? '');
+
+  if ($next_due_date === '') {
+    return '';
+  }
+
+  $reserve_balance = isset($bill['reserve_balance']) ? (float)$bill['reserve_balance'] : 0.00;
+  $covered_cycles = covered_cycles_from_reserve($bill, $reserve_balance);
+
+  if ($covered_cycles < 1) {
+    return $next_due_date;
+  }
+
+  $months_back = months_to_advance_for_bill($bill, $covered_cycles);
+
+  return add_months_to_date($next_due_date, -$months_back);
+}
+
+function generate_projected_bill_events(array $rows, int $months_ahead = 12): array
+{
+  $events = [];
+  $today = new DateTime('today');
+  $end_date = clone $today;
+  $end_date->modify('+' . $months_ahead . ' months');
+
+  foreach ($rows as $row) {
+    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+    $next_due_date = (string)($row['next_due_date'] ?? '');
+    $base_amount = base_amount_for_bill($row);
+
+    if ($paid_from !== 'paypal') {
+      continue;
+    }
+
+    if ($next_due_date === '' || $base_amount <= 0) {
+      continue;
+    }
+
+    $cycle_months = months_to_advance_for_bill($row, 1);
+    $cursor = new DateTime($next_due_date);
+    $cursor->setTime(0, 0, 0);
+
+    while ($cursor <= $end_date) {
+      $events[] = [
+        'billing_account_id' => (int)$row['billing_account_id'],
+        'billing_name' => (string)$row['billing_name'],
+        'vendor_name' => (string)($row['vendor_name'] ?? ''),
+        'intake_note' => (string)($row['intake_note'] ?? ''),
+        'cadence' => (string)($row['cadence'] ?? ''),
+        'due_date' => $cursor->format('Y-m-d'),
+        'amount' => $base_amount,
+        'paid_from_account' => (string)($row['paid_from_account'] ?? ''),
+        'cycle_months' => $cycle_months
+      ];
+
+      $cursor->modify('+' . $cycle_months . ' months');
+    }
+  }
+
+  usort($events, function ($a, $b) {
+    if ($a['due_date'] === $b['due_date']) {
+      return strcmp($a['billing_name'], $b['billing_name']);
+    }
+
+    return strcmp($a['due_date'], $b['due_date']);
+  });
+
+  return $events;
+}
+
+function apply_pool_to_projected_events(array $events, float $pool_amount): array
+{
+  $remaining_pool = round($pool_amount, 2);
+  $processed = [];
+
+  foreach ($events as $event) {
+    $amount = (float)$event['amount'];
+    $covered = min($remaining_pool, $amount);
+    $remaining_due = round($amount - $covered, 2);
+
+    if ($remaining_due <= 0) {
+      $remaining_due = 0.00;
+      $status = 'paid';
+    } elseif ($covered > 0) {
+      $status = 'partial';
+    } else {
+      $status = 'due';
+    }
+
+    $processed[] = array_merge($event, [
+      'covered_by_pool' => round($covered, 2),
+      'remaining_due' => $remaining_due,
+      'status' => $status,
+      'pool_remaining_after' => round($remaining_pool - $covered, 2)
+    ]);
+
+    $remaining_pool = round($remaining_pool - $covered, 2);
+
+    if ($remaining_pool < 0) {
+      $remaining_pool = 0.00;
+    }
+  }
+
+  return [
+    'events' => $processed,
+    'starting_pool' => round($pool_amount, 2),
+    'ending_pool' => round($remaining_pool, 2)
+  ];
+}
+

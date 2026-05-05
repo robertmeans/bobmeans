@@ -45,3 +45,8 @@ function display_errors($errors=array()) {
   }
   return $output;
 }
+
+function redirect_to(string $location): void {
+  header('Location: ' . $location);
+  exit();
+}

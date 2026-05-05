@@ -49,7 +49,7 @@
   width: 100%;
 }
 .paypal-running-balance {
-  margin-top: 1em;
+  margin-top: 0.5em;
 }
 form {
   display: flex;
@@ -107,21 +107,75 @@ button {
 table {
   background-color: rgba(255,255,255,0.8);
   color: #313131;
+  font-size: 0.9em;
+  border-collapse: collapse;
   th, 
   td {
-    padding: 0.5em 1em;
+    font-weight: normal;
+    padding: 2px;
+    text-align: left;
     &.pay {
       display: flex;
       justify-content: center;
-      padding: 0.5em 0.25em;
+      // padding: 0.5em 0.25em;
+      padding: 2px;
       // align-self: center;
       // padding: 3px;
       // margin: 3px;
+    }
+    &.paypal {
+      text-align: center;
     }
   }
   tr:nth-child(even) {
     background-color: rgba(255,255,255,0.8);
   }
+
+
+
+
+
+  tr.thisYear {
+    background-color: #ffc000;
+    &:nth-child(even) {
+      background-color: #ffc926;
+    }
+  }
+
+  tr.nextYear {
+    background-color: #91f50b;
+    &:nth-child(even) {
+      background-color: #a1f533;
+    }
+  }
+
+  tr.twoYears {
+    background-color: #ffff00;
+    &:nth-child(even) {
+      background-color: #ffff63;
+    }
+  }
+
+
+
+
+
+
+
+
+  tr.tbr {
+    background-color: #313131;
+    color: #fff;
+  }
+  tr.monthlyFixed {
+    background-color: #ff4f4f;
+    color: #fff;
+    border-bottom: 2px solid rgba(255,255,255,0.3);
+    &.lot {
+      border-bottom: none;
+    }
+  }
+
   thead {
     background-color: #313131;
     color: #fff;
@@ -131,5 +185,5 @@ table {
   margin-right: 1em;
 }
 .paypal-icon {
-  max-width: 20px;
+  max-width: 16px;
 }

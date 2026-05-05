@@ -2,8 +2,6 @@
 require_once 'config/initialize.php';
 verify_loggedin();
 require '_functions/billing_functions.php';
-require '_includes/header.php';
-require '_includes/nav.php';
 
 $pdo_db = pdo_connect();
 
@@ -179,6 +177,9 @@ if (is_post_request() && isset($_POST['submit_bill_payment']) && $billing_accoun
     }
   }
 }
+
+require '_includes/header.php';
+require '_includes/nav.php';
 ?>
 
 <div class="intake-form">

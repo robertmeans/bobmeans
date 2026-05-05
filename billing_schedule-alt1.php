@@ -65,8 +65,8 @@ foreach ($rows as $row) {
       <thead>
         <tr>
           <th class="pay">&nbsp;</th>
-          <th>Billing Account</th>
           <th>Base</th>
+          <th>Billing Account</th>
           <th>Amount Due</th>
           <th>Next Due</th>
           <th>&nbsp;</th>
@@ -78,8 +78,8 @@ foreach ($rows as $row) {
     <?php if (bob()) { ?>
       <tr class="monthlyFixed">
         <td class="paypal">Fixed</td>
+        <td>$23.93</td>
         <td>2367 | Protective Life</td>
-        <td>&nbsp;</td>
         <td>$23.93</td>
         <td>7<sup>th</sup></td>
         <td>&nbsp;</td>
@@ -87,8 +87,8 @@ foreach ($rows as $row) {
       </tr>
       <tr class="monthlyFixed">
         <td class="paypal">Fixed</td>
+        <td>$12.00</td>
         <td>2367 | 1st Bank Activity Charge</td>
-        <td>&nbsp;</td>
         <td>$12.00</td>
         <td>22<sup>nd</sup></td>
         <td>&nbsp;</td>
@@ -96,8 +96,8 @@ foreach ($rows as $row) {
       </tr>
       <tr class="monthlyFixed lot">
         <td class="paypal">Fixed</td>
+        <td>$14.00</td>
         <td>4009 | 1st Bank Activity Charge</td>
-        <td>&nbsp;</td>
         <td>$14.00</td>
         <td>28<sup>th</sup></td>
         <td>&nbsp;</td>
@@ -114,6 +114,10 @@ foreach ($rows as $row) {
             if ($classDate === date('y')) { echo 'thisYear'; }
             elseif ($classDate === date('y', strtotime('+1 year'))) { echo 'nextYear'; }
             else { echo 'twoYears'; }
+
+            // if ($classDate <= date('y', strtotime('+3 months'))) { echo 'w-inThreeMonths'; }
+            // elseif ($classDate === date('y', strtotime('+1 year'))) { echo 'nextYear'; }
+            // else { echo 'twoYears'; }
 
          ?>">
           <td class="pay"><?php /* Action | Pay | $ */ ?>
@@ -134,6 +138,10 @@ foreach ($rows as $row) {
           </td>
 
 
+          <td><?php /* base */ ?>
+            $<?php echo number_format((float)$row['default_amount'], 2); ?>
+          </td>
+
           <td><?php /* Billing Account */ ?>
             <?php echo htmlspecialchars($row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
 
@@ -149,9 +157,7 @@ foreach ($rows as $row) {
 
           </td>
 
-          <td>
-            $<?php echo number_format((float)$row['default_amount'], 2); ?>
-          </td>
+
 
           <td><?php /* Amount Due */ ?>
             $<?php echo number_format(amount_due_after_reserve($row), 2); ?>
@@ -181,8 +187,7 @@ foreach ($rows as $row) {
 
       <tr class="tbr"><?php /* target balance row */ ?>
         <td>&nbsp;</td>
-        <td>PayPal Target Balance</td>
-        <td>&nbsp;</td>
+        <td colspan="2" style="padding:5px 0px;">PayPal Target Balance</td>
         <td>&nbsp;</td>
         <td>&nbsp;</td>
         <td>&nbsp;</td>
@@ -190,6 +195,7 @@ foreach ($rows as $row) {
           $<?php echo number_format($paypal_target_balance, 2); ?>  
         </td>
       </tr>
+
 
       </tbody>
     </table>

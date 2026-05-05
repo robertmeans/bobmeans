@@ -105,11 +105,11 @@ $(document).ready(function() {
 
       success: function(response) {
         if (response) {
-          if (response.signal === 'ok') {
+          if (response['signal'] == 'ok') {
             $('#authcon').html('<div class="successmessage">Success! Check your email for a verification link. Give it a minute or two and check your spam folder if you don\'t see it in your inbox.<br><br><a class="log-form">Show login</a></div>');
           } else {
-            $('#login-alert').addClass('show ' + response.class);
-            $('#errors').html(response.li);
+            $('#login-alert').addClass('show ' + response['class']);
+            $('#errors').html(response['li']);
             $('#toggle-btn').html('<button type="submit" class="processing-btn" id="signup-btn"><span class="login-txt">Try again</span></button>');
           }
         }

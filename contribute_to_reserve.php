@@ -2,8 +2,6 @@
 require_once 'config/initialize.php';
 verify_loggedin();
 require '_functions/billing_functions.php';
-require '_includes/header.php';
-require '_includes/nav.php';
 
 $pdo_db = pdo_connect();
 
@@ -42,19 +40,39 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
   }
 
   if (!$errors) {
-    $new_reserve_balance = (float)$billing_account['reserve_balance'] + (float)$contribution_amount;
+    $current_reserve_balance = (float)$billing_account['reserve_balance'];
+    $contribution = (float)$contribution_amount;
+    $new_reserve_balance = round($current_reserve_balance + $contribution, 2);
+
+    $covered_cycles_before = covered_cycles_from_reserve($billing_account, $current_reserve_balance);
+    $covered_cycles_after = covered_cycles_from_reserve($billing_account, $new_reserve_balance);
+
+    $newly_covered_cycles = $covered_cycles_after - $covered_cycles_before;
+
+    $new_next_due_date = $billing_account['next_due_date'];
+
+    if ($newly_covered_cycles > 0) {
+      $new_next_due_date = advance_next_due_date_by_cycles(
+        $billing_account,
+        $billing_account['next_due_date'],
+        $newly_covered_cycles
+      );
+    }
 
     $stmt = $pdo_db->prepare("
       UPDATE billing_accounts
       SET
         reserve_balance = ?,
+        next_due_date = ?,
         updated_at = NOW()
       WHERE billing_account_id = ?
         AND user_id = ?
       LIMIT 1
     ");
+
     $stmt->execute([
-      round($new_reserve_balance, 2),
+      $new_reserve_balance,
+      $new_next_due_date,
       $billing_account['billing_account_id'],
       $user_id
     ]);
@@ -62,6 +80,9 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
     redirect_to('billing_schedule.php');
   }
 }
+
+require '_includes/header.php';
+require '_includes/nav.php';
 ?>
 
 <div class="intake-form">
@@ -82,8 +103,12 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
     <?php if ($billing_account): ?>
       <div class="success" style="display: block;">
         <strong><?php echo htmlspecialchars($billing_account['billing_name'], ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        Default Amount: $<?php echo number_format((float)$billing_account['default_amount'], 2); ?><br>
         Current Reserve: $<?php echo number_format((float)$billing_account['reserve_balance'], 2); ?><br>
-        Next Due Date: <?php echo htmlspecialchars($billing_account['next_due_date'], ENT_QUOTES, 'UTF-8'); ?>
+        Next Due Date: <?php 
+            $original = $billing_account['next_due_date'];
+            $newDate = date("m.d.y", strtotime($original));
+            echo $newDate; ?>
       </div>
 
       <form method="post">

@@ -105,13 +105,30 @@ if (isset($_POST['sign_up_process_routine'])) {
         ");
         $stmt->execute([$username, $email, $verified, $token, $hashedPassword]);
 
+        // if (WWW !== 'dev') {
+        //   sendVerificationEmail($username, $email, $token);
+        // } else {
+        //   usleep($t);
+        // }
+        // $signal = 'ok';
+
+
+
         if (WWW !== 'dev') {
-          sendVerificationEmail($username, $email, $token);
+          $emailSent = sendVerificationEmail($username, $email, $token);
+
+          if (!$emailSent) {
+            error_log("User {$email} was created but verification email failed.");
+          }
         } else {
           usleep($t);
         }
 
         $signal = 'ok';
+
+
+
+
 
       } catch (PDOException $e) {
         $addError('Database error: failed to register. Please try again later. There are issues on the server that are being worked on.');
