@@ -159,7 +159,10 @@ table {
 
 
 
-
+  tr.partial {
+    background-color: #fff54f;
+    color: #313131;
+  }
 
 
 
@@ -167,8 +170,7 @@ table {
     background-color: #313131;
     color: #fff;
   }
-  tr.monthlyFixed,
-  tr.partial {
+  tr.monthlyFixed {
     background-color: #ff4f4f;
     color: #fff;
     border-bottom: 2px solid rgba(255,255,255,0.3);

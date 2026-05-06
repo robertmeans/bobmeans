@@ -70,12 +70,14 @@ require '_includes/nav.php';
         <tr class="<?php echo htmlspecialchars($event['status'], ENT_QUOTES, 'UTF-8'); ?>">
           <td>
             <?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+        <?php if (false): ?>
             <?php if ($event['vendor_name'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
             <?php if ($event['intake_note'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['intake_note'], ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
+        <?php endif; ?>
           </td>
 
           <td><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>
