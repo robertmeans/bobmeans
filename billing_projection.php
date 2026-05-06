@@ -18,6 +18,8 @@ $stmt = $pdo_db->prepare("
     ba.reserve_balance,
     ba.next_due_date,
     ba.renewal_term_months,
+    ba.due_day_of_month,
+    ba.due_month_of_year,
     ba.is_active,
     fa.account_name AS paid_from_account
   FROM billing_accounts ba
@@ -31,8 +33,6 @@ $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $pool_amount = pooled_paypal_balance($rows);
-
-/* adjust this horizon however you want */
 $months_ahead = 12;
 
 $events = generate_projected_bill_events($rows, $months_ahead);
@@ -45,7 +45,7 @@ require '_includes/nav.php';
 <div class="intake-form">
   <div class="billing-schedule">
 
-    <h1>Billing Projection</h1>
+    <?php /* <h1>Billing Projection</h1> */ ?>
 
     <div class="paypal-running-balance">
       <strong>Pooled PayPal Reserve:</strong>
@@ -70,14 +70,12 @@ require '_includes/nav.php';
         <tr class="<?php echo htmlspecialchars($event['status'], ENT_QUOTES, 'UTF-8'); ?>">
           <td>
             <?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
-        <?php if (false): ?>
             <?php if ($event['vendor_name'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
             <?php if ($event['intake_note'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['intake_note'], ENT_QUOTES, 'UTF-8'); ?></small>
             <?php endif; ?>
-        <?php endif; ?>
           </td>
 
           <td><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>

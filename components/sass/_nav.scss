@@ -26,7 +26,7 @@
   border-width: 0 1px 1px 1px;
   border-color: rgba(255,255,255,0.6);
   border-radius: 0px 0px 3px 3px;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   &:hover {
     margin-top: 0;
     // padding-top: 0.75em;
@@ -57,7 +57,7 @@
   position: absolute;
   display: block;
   content: "";
-  transition: all 300ms ease-in-out;
+  transition: all 150ms ease-in-out;
 }
 .top-nav .bars:before {
   top: -6px;
@@ -92,7 +92,6 @@
 #sidenav-wrapper {
   display: flex;
   flex-direction: column;
-  // height: 100%;
   height: 100vh;
   height: 100dvh;
 
@@ -106,12 +105,11 @@
   width: 300px;
   min-height: 100vh;
   height: 100dvh;
-  
   background-color: #232c24;
   overflow-y: auto;
   overflow-x: hidden;
   transform: translateX(100%);
-  transition: transform 0.5s ease;
+  transition: transform 0.15s ease;
   &.open {
     transform: translateX(0);
   }

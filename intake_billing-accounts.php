@@ -18,6 +18,8 @@ $cadence = 'monthly';
 $reserve_style = 'sinking_fund';
 $default_amount = '';
 $annual_cost = '';
+$due_day_of_month = '';
+$due_month_of_year = '';
 $next_due_date = '';
 $paid_through_date = '';
 $last_paid_date = '';
@@ -50,6 +52,8 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
   $annual_cost = trim($_POST['annual_cost'] ?? '');
+  $due_day_of_month = trim($_POST['due_day_of_month'] ?? '');
+  $due_month_of_year = trim($_POST['due_month_of_year'] ?? '');
   $next_due_date = trim($_POST['next_due_date'] ?? '');
   $paid_through_date = trim($_POST['paid_through_date'] ?? '');
   $last_paid_date = trim($_POST['last_paid_date'] ?? '');
@@ -86,6 +90,18 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $errors[] = 'Annual cost must be numeric if provided.';
   }
 
+  if ($due_day_of_month === '' || !ctype_digit((string)$due_day_of_month) || (int)$due_day_of_month < 1 || (int)$due_day_of_month > 31) {
+    $errors[] = 'Due day of month must be between 1 and 31.';
+  }
+
+  if ($cadence === 'annual') {
+    if ($due_month_of_year === '' || !ctype_digit((string)$due_month_of_year) || (int)$due_month_of_year < 1 || (int)$due_month_of_year > 12) {
+      $errors[] = 'Due month of year must be between 1 and 12 for annual bills.';
+    }
+  } else {
+    $due_month_of_year = null;
+  }
+
   if ($next_due_date === '') {
     $errors[] = 'Next due date is required.';
   }
@@ -114,6 +130,8 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
   $default_funding_account_id = ($default_funding_account_id === '') ? null : (int)$default_funding_account_id;
   $transfer_from_funding_account_id = ($transfer_from_funding_account_id === '') ? null : (int)$transfer_from_funding_account_id;
   $annual_cost = ($annual_cost === '') ? null : $annual_cost;
+  $due_day_of_month = (int)$due_day_of_month;
+  $due_month_of_year = ($due_month_of_year === null || $due_month_of_year === '') ? null : (int)$due_month_of_year;
   $paid_through_date = ($paid_through_date === '') ? null : $paid_through_date;
   $last_paid_date = ($last_paid_date === '') ? null : $last_paid_date;
   $renewal_term_months = (int)$renewal_term_months;
@@ -144,19 +162,18 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
         cadence,
         reserve_style,
         default_amount,
-        annual_cost,
         reserve_balance,
         next_due_date,
-        paid_through_date,
-        last_paid_date,
         renewal_term_months,
+        due_day_of_month,
+        due_month_of_year,
         default_funding_account_id,
         transfer_from_funding_account_id,
         is_autopay,
         auto_advance_on_payment,
         is_active,
         sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -167,12 +184,11 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       $cadence,
       $reserve_style,
       $default_amount,
-      $annual_cost,
       $reserve_balance,
       $next_due_date,
-      $paid_through_date,
-      $last_paid_date,
       $renewal_term_months,
+      $due_day_of_month,
+      $due_month_of_year,
       $default_funding_account_id,
       $transfer_from_funding_account_id,
       $is_autopay,
@@ -191,6 +207,8 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $reserve_style = 'sinking_fund';
     $default_amount = '';
     $annual_cost = '';
+    $due_day_of_month = '';
+    $due_month_of_year = '';
     $next_due_date = '';
     $paid_through_date = '';
     $last_paid_date = '';
@@ -259,6 +277,37 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
           </select>
         </div>
       </div>
+
+
+
+      <div class="two-col">
+        <div class="row">
+          <label for="due_day_of_month">Due Day of Month</label>
+          <input
+            type="number"
+            id="due_day_of_month"
+            name="due_day_of_month"
+            min="1"
+            max="31"
+            value="<?php echo htmlspecialchars((string)$due_day_of_month, ENT_QUOTES, 'UTF-8'); ?>"
+            required
+          >
+        </div>
+
+        <div class="row">
+          <label for="due_month_of_year">Due Month of Year</label>
+          <input
+            type="number"
+            id="due_month_of_year"
+            name="due_month_of_year"
+            min="1"
+            max="12"
+            value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>"
+          >
+        </div>
+      </div>
+
+
 
       <div class="two-col">
         <div class="row">

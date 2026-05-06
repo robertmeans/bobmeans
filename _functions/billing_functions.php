@@ -108,10 +108,6 @@ function paypal_reserved_amount_for_bill(array $row, DateTime $today): float
   return 0.00;
 }
 
-
-
-
-
 function payment_amount_for_bill(array $bill, int $cycles_paid = 1): float
 {
   $cadence = (string)($bill['cadence'] ?? '');
@@ -378,32 +374,6 @@ function advance_next_due_date_by_cycles(array $bill, string $next_due_date, int
   return add_months_to_date($next_due_date, $months_to_advance);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function base_amount_for_bill(array $bill): float
-{
-  return round((float)($bill['default_amount'] ?? 0), 2);
-}
-
 function covered_cycles_from_reserve(array $bill, float $reserve_balance): int
 {
   $base_amount = base_amount_for_bill($bill);
@@ -414,23 +384,6 @@ function covered_cycles_from_reserve(array $bill, float $reserve_balance): int
 
   return (int)floor($reserve_balance / $base_amount);
 }
-
-function pooled_paypal_balance(array $rows): float
-{
-  $total = 0.00;
-
-  foreach ($rows as $row) {
-    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-
-    if ($paid_from === 'paypal') {
-      $total += (float)($row['reserve_balance'] ?? 0);
-    }
-  }
-
-  return round($total, 2);
-}
-
-
 
 function add_months_to_date(string $date_string, int $months): string
 {
@@ -473,29 +426,151 @@ function projected_actual_due_date(array $bill): string
   return add_months_to_date($next_due_date, -$months_back);
 }
 
+function base_amount_for_bill(array $bill): float
+{
+  return round((float)($bill['default_amount'] ?? 0), 2);
+}
+
+function pooled_paypal_balance(array $rows): float
+{
+  $total = 0.00;
+
+  foreach ($rows as $row) {
+    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+
+    if ($paid_from === 'paypal') {
+      $total += (float)($row['reserve_balance'] ?? 0);
+    }
+  }
+
+  return round($total, 2);
+}
+
+function safe_day_for_month(int $year, int $month, int $day): int
+{
+  $last_day = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+
+  if ($day < 1) {
+    return 1;
+  }
+
+  if ($day > $last_day) {
+    return $last_day;
+  }
+
+  return $day;
+}
+
+function next_monthly_occurrence_from_anchor(int $due_day_of_month, DateTime $today): ?DateTime
+{
+  if ($due_day_of_month < 1 || $due_day_of_month > 31) {
+    return null;
+  }
+
+  $year = (int)$today->format('Y');
+  $month = (int)$today->format('n');
+
+  $day_this_month = safe_day_for_month($year, $month, $due_day_of_month);
+  $candidate = new DateTime(sprintf('%04d-%02d-%02d', $year, $month, $day_this_month));
+  $candidate->setTime(0, 0, 0);
+
+  if ($candidate < $today) {
+    $next_month = clone $today;
+    $next_month->modify('first day of next month');
+
+    $year = (int)$next_month->format('Y');
+    $month = (int)$next_month->format('n');
+    $day_next_month = safe_day_for_month($year, $month, $due_day_of_month);
+
+    $candidate = new DateTime(sprintf('%04d-%02d-%02d', $year, $month, $day_next_month));
+    $candidate->setTime(0, 0, 0);
+  }
+
+  return $candidate;
+}
+
+function next_annual_occurrence_from_anchor(int $due_month_of_year, int $due_day_of_month, DateTime $today): ?DateTime
+{
+  if ($due_month_of_year < 1 || $due_month_of_year > 12) {
+    return null;
+  }
+
+  if ($due_day_of_month < 1 || $due_day_of_month > 31) {
+    return null;
+  }
+
+  $year = (int)$today->format('Y');
+  $day_this_year = safe_day_for_month($year, $due_month_of_year, $due_day_of_month);
+
+  $candidate = new DateTime(sprintf('%04d-%02d-%02d', $year, $due_month_of_year, $day_this_year));
+  $candidate->setTime(0, 0, 0);
+
+  if ($candidate < $today) {
+    $year++;
+    $day_next_year = safe_day_for_month($year, $due_month_of_year, $due_day_of_month);
+
+    $candidate = new DateTime(sprintf('%04d-%02d-%02d', $year, $due_month_of_year, $day_next_year));
+    $candidate->setTime(0, 0, 0);
+  }
+
+  return $candidate;
+}
+
+function first_projected_due_date(array $bill, DateTime $today): ?DateTime
+{
+  $cadence = (string)($bill['cadence'] ?? '');
+  $due_day_of_month = isset($bill['due_day_of_month']) ? (int)$bill['due_day_of_month'] : 0;
+  $next_due_date = trim((string)($bill['next_due_date'] ?? ''));
+
+  if ($cadence === 'monthly') {
+    return next_monthly_occurrence_from_anchor($due_day_of_month, $today);
+  }
+
+  if ($cadence === 'annual') {
+    if ($next_due_date === '') {
+      return null;
+    }
+
+    try {
+      $stored_next_due = new DateTime($next_due_date);
+      $stored_next_due->setTime(0, 0, 0);
+      return $stored_next_due;
+    } catch (Exception $e) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 function generate_projected_bill_events(array $rows, int $months_ahead = 12): array
 {
   $events = [];
   $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
   $end_date = clone $today;
   $end_date->modify('+' . $months_ahead . ' months');
 
   foreach ($rows as $row) {
     $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-    $next_due_date = (string)($row['next_due_date'] ?? '');
     $base_amount = base_amount_for_bill($row);
+    $cadence = (string)($row['cadence'] ?? '');
+    $cycle_months = months_to_advance_for_bill($row, 1);
 
     if ($paid_from !== 'paypal') {
       continue;
     }
 
-    if ($next_due_date === '' || $base_amount <= 0) {
+    if ($base_amount <= 0) {
       continue;
     }
 
-    $cycle_months = months_to_advance_for_bill($row, 1);
-    $cursor = new DateTime($next_due_date);
-    $cursor->setTime(0, 0, 0);
+    $cursor = first_projected_due_date($row, $today);
+
+    if (!$cursor) {
+      continue;
+    }
 
     while ($cursor <= $end_date) {
       $events[] = [
@@ -503,11 +578,10 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
         'billing_name' => (string)$row['billing_name'],
         'vendor_name' => (string)($row['vendor_name'] ?? ''),
         'intake_note' => (string)($row['intake_note'] ?? ''),
-        'cadence' => (string)($row['cadence'] ?? ''),
+        'cadence' => $cadence,
         'due_date' => $cursor->format('Y-m-d'),
         'amount' => $base_amount,
-        'paid_from_account' => (string)($row['paid_from_account'] ?? ''),
-        'cycle_months' => $cycle_months
+        'paid_from_account' => (string)($row['paid_from_account'] ?? '')
       ];
 
       $cursor->modify('+' . $cycle_months . ' months');
@@ -516,10 +590,10 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
 
   usort($events, function ($a, $b) {
     if ($a['due_date'] === $b['due_date']) {
-      return strcmp($a['billing_name'], $b['billing_name']);
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
     }
 
-    return strcmp($a['due_date'], $b['due_date']);
+    return strcmp((string)$a['due_date'], (string)$b['due_date']);
   });
 
   return $events;
@@ -564,4 +638,3 @@ function apply_pool_to_projected_events(array $events, float $pool_amount): arra
     'ending_pool' => round($remaining_pool, 2)
   ];
 }
-

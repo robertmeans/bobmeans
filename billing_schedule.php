@@ -202,6 +202,7 @@ foreach ($rows as $row) {
 <?php endif; ?>
 
     <div class="inner-links">
+      <a href="billing_projection.php">Projection</a> | 
       <a href="intake_funding-accounts.php">New Funding Account</a> |
       <a href="intake_billing-accounts.php">New Bill</a>
     </div>

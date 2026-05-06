@@ -3,7 +3,7 @@ function openNav() {
   const isOpen = sideNav.classList.contains("open");
 
   if (isOpen) {
-    $('#side-nav-bkg').fadeOut(501);
+    $('#side-nav-bkg').fadeOut(151);
     sideNav.classList.remove("open");
     $('.top-nav').removeClass('acty');
   } else {
@@ -16,7 +16,7 @@ function openNav() {
 function closeNav() {
   const sideNav = document.getElementById("side-nav");
   sideNav.classList.remove("open");
-  $('#side-nav-bkg').fadeOut(501);
+  $('#side-nav-bkg').fadeOut(151);
   $('.top-nav').removeClass('acty');
 }
 

@@ -7,8 +7,6 @@ function verify_loggedin() {
   } 
 }
 
-
-
 function bob() { /* President = 99 | There should be only 1 President */
   if (isset($_SESSION['role']) && $_SESSION['role'] == 99) {
     return true;
