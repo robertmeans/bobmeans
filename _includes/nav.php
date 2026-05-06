@@ -38,11 +38,14 @@
         <?php } ?>
       <?php } ?>
 
-      <a href="billing_schedule.php">Billing Schedule</a>
+      <a href="billing_schedule.php">Schedule</a>
       <a href="billing_projection.php">Projection</a>
-      <a href="intake_funding-accounts.php">New Funding Account</a>
-      <a href="intake_billing-accounts.php">New Bill</a>
-
+      <a href="billing_accounts.php">Billing Accounts</a>
+      <a href="intake_billing-accounts.php">Add New Bill</a>
+      <a href="funding_accounts.php">Funding Accounts</a>
+      <a href="intake_funding-accounts.php">Add New Funding</a>
+      
+      
       <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
 
     </div>

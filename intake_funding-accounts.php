@@ -148,7 +148,7 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
 
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Billing Schedule</a> | <a href="intake_billing-accounts.php">New Bill</a>
+      <a href="billing_schedule.php">Schedule</a> | <a href="intake_billing-accounts.php">New Bill</a>
     </div>
 
   </div>

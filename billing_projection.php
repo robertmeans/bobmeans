@@ -47,9 +47,10 @@ require '_includes/nav.php';
 
     <?php /* <h1>Billing Projection</h1> */ ?>
 
-    <div class="paypal-running-balance">
-      <strong>Pooled PayPal Reserve:</strong>
-      $<?php echo number_format($projection['starting_pool'], 2); ?>
+    <div class="paypal-running-balance inner-links top">
+      <a href="billing_schedule.php">Schedule</a> | 
+      <strong style="margin-left:1em;">Pooled PayPal Reserve:</strong>
+      &nbsp;&nbsp;$<?php echo number_format($projection['starting_pool'], 2); ?>
     </div>
 
     <table>
@@ -65,11 +66,41 @@ require '_includes/nav.php';
         </tr>
       </thead>
       <tbody>
+      <?php
+        /* this is to put a class in the 1st tr that's *either* partial OR due */
+        $attention_index = null;
+        $attention_class = '';
 
-      <?php foreach ($projection['events'] as $event): ?>
-        <tr class="<?php echo htmlspecialchars($event['status'], ENT_QUOTES, 'UTF-8'); ?>">
+        foreach ($projection['events'] as $index => $event) {
+          if ($event['status'] === 'partial') {
+            $attention_index = $index;
+            $attention_class = 'first-partial';
+            break;
+          }
+        }
+
+        if ($attention_index === null) {
+          foreach ($projection['events'] as $index => $event) {
+            if ($event['status'] === 'due') {
+              $attention_index = $index;
+              $attention_class = 'first-due';
+              break;
+            }
+          }
+        }
+
+        foreach ($projection['events'] as $index => $event): 
+
+        $row_classes = [$event['status']];
+
+        if ($attention_index !== null && $index === $attention_index) {
+          $row_classes[] = $attention_class;
+        }
+        /* this class goes in the next tr directly below... */
+        ?>
+        <tr class="<?php echo htmlspecialchars(implode(' ', $row_classes), ENT_QUOTES, 'UTF-8'); ?>">
           <td>
-            <?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+            <a class="editAcctLink" href="edit_billing-account.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
         <?php if (false): ?>
             <?php if ($event['vendor_name'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
@@ -108,8 +139,8 @@ require '_includes/nav.php';
     </table>
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Standard Billing Schedule</a> |
-      <a href="intake_funding-accounts.php">New Funding Account</a> |
+      <a href="billing_schedule.php">Schedule</a> |
+      <a href="intake_funding-accounts.php">New Funding</a> |
       <a href="intake_billing-accounts.php">New Bill</a>
     </div>
 

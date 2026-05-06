@@ -30,6 +30,13 @@
       text-decoration: underline;
     }
   }
+  &.top {
+    margin-top: 0;
+    padding: 0px 0px 5px 0px;
+    a {
+      margin: 0 1em 0;
+    }
+  }
 }
 .two-col {
   display: flex;
@@ -48,9 +55,9 @@
   flex-direction: column;
   width: 100%;
 }
-.paypal-running-balance {
-  margin-top: 0.5em;
-}
+// .paypal-running-balance {
+//   margin-top: 0.5em;
+// }
 form {
   display: flex;
   flex-direction: column;
@@ -70,6 +77,12 @@ input.memo {
   label {
     margin: 0 1.5em;
   }
+}
+textarea {
+  font-family: inherit;
+  font-size: 1em;
+  padding: 0.5em;
+  resize: vertical;
 }
 button {
   display: flex;
@@ -127,6 +140,22 @@ table {
       text-align: center;
     }
   }
+  td a.editAcctLink {
+    color: inherit;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  tr.inactive-row td {
+    opacity: 0.55;
+  }
+
+  tr.inactive-row td a {
+    opacity: 1;
+  }
+
   tr:nth-child(even) {
     background-color: rgba(255,255,255,0.8);
   }
@@ -157,13 +186,15 @@ table {
   }
 
 
-
-
-  tr.partial {
+  // tr.partial
+  tr.first-partial {
     background-color: #fff54f;
     color: #313131;
   }
-
+  tr.first-due {
+    background-color: #ffd84f;
+    color: #000;
+  }
 
 
   tr.tbr {

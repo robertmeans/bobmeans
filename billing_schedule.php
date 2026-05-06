@@ -60,6 +60,9 @@ foreach ($rows as $row) {
   <div class="billing-schedule">
 
     <?php /* <h1>Billing Schedule</h1> */ ?>
+    <div class="inner-links top">
+      <a href="billing_projection.php">Projection</a>
+    </div>
 
     <table>
       <thead>
@@ -135,7 +138,7 @@ foreach ($rows as $row) {
 
 
           <td><?php /* Billing Account */ ?>
-            <?php echo htmlspecialchars($row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+            <a class="editAcctLink" href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>"><?php echo htmlspecialchars($row['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
 
 
 <?php if (false): /* genius! 05.04.26 09:16 - I just learned how to comment blocks of php! */?>

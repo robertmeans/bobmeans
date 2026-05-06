@@ -10,7 +10,7 @@
   <?php if (WWW === 'dev') { ?>
     <title>Local version</title>
   <?php } else { ?>
-    <title>Online version</title>
+    <title>Budget Buffer</title>
   <?php } ?>
   <?php /* <title>Budget Allocation Organization</title> */ ?>
 

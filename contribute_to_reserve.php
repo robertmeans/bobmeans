@@ -77,6 +77,26 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
       $user_id
     ]);
 
+    $stmt = $pdo_db->prepare("
+      INSERT INTO bill_reserve_transactions (
+        billing_account_id,
+        user_id,
+        transaction_type,
+        amount,
+        transaction_date,
+        note
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    ");
+
+    $stmt->execute([
+      $billing_account['billing_account_id'],
+      $user_id,
+      'contribution',
+      $contribution,
+      date('Y-m-d H:i:s'),
+      $contribution_note !== '' ? $contribution_note : null
+    ]);
+
     redirect_to('billing_schedule.php');
   }
 }
@@ -129,14 +149,22 @@ require '_includes/nav.php';
           </div>
 
           <div class="row">
-            <label for="contribution_note">Note</label>
-            <input
-              type="text"
-              id="contribution_note"
-              name="contribution_note"
-              value="<?php echo htmlspecialchars($contribution_note, ENT_QUOTES, 'UTF-8'); ?>"
-            >
+            &nbsp;
           </div>
+        </div>
+
+        <div class="row standalone">
+          <label for="contribution_note">Note</label>
+          <textarea
+            rows="5" 
+            cols="40" 
+            wrap="soft" 
+            id="contribution_note" 
+            class="memo" 
+            name="contribution_note"
+            value="<?php echo htmlspecialchars($contribution_note, ENT_QUOTES, 'UTF-8'); ?>"
+          ></textarea>
+
         </div>
 
         <button type="submit">Add to Reserve</button>
@@ -144,7 +172,8 @@ require '_includes/nav.php';
     <?php endif; ?>
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Billing Schedule</a>
+      <a href="billing_schedule.php">Schedule</a> | 
+      <a href="billing_projection.php">Projection</a>
     </div>
 
   </div>
