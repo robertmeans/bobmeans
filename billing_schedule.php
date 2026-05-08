@@ -43,15 +43,20 @@ $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
-$paypal_target_balance = 0.00;
+// $paypal_target_balance = 0.00;
 
-foreach ($rows as $row) {
-  $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+// foreach ($rows as $row) {
+//   $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
 
-  if ($paid_from === 'paypal') {
-    $paypal_target_balance += (float)$row['reserve_balance'];
-  }
-}
+//   if ($paid_from === 'paypal') {
+//     $paypal_target_balance += (float)$row['reserve_balance'];
+//   }
+// }
+
+// ^^^ replaced with...
+
+$reserve_totals = reserve_totals_by_funding_account($rows);
+$paypal_target_balance = reserve_total_for_funding_account($rows, 'PayPal');
 
 ?>
 
@@ -196,6 +201,22 @@ foreach ($rows as $row) {
 
       </tbody>
     </table>
+
+
+
+<div class="paypal-running-balance">
+  <?php foreach ($reserve_totals as $account_name => $amount): ?>
+    <div>
+      <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> Target Balance:</strong>
+      $<?php echo number_format($amount, 2); ?>
+    </div>
+  <?php endforeach; ?>
+</div>
+
+
+
+
+    
 
 <?php if (false): ?>
     <div class="paypal-running-balance">

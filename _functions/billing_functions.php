@@ -79,34 +79,34 @@ function annual_prepaid_rebuild_amount(
   return round($reserve, 2);
 }
 
-function paypal_reserved_amount_for_bill(array $row, DateTime $today): float
-{
-  $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-  if ($paid_from !== 'paypal') {
-    return 0.00;
-  }
+// function paypal_reserved_amount_for_bill(array $row, DateTime $today): float
+// {
+//   $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+//   if ($paid_from !== 'paypal') {
+//     return 0.00;
+//   }
 
-  $cadence = (string)($row['cadence'] ?? '');
-  $reserve_style = (string)($row['reserve_style'] ?? 'sinking_fund');
-  $default_amount = (float)($row['default_amount'] ?? 0);
-  $next_due_date = (string)($row['next_due_date'] ?? '');
-  $reserve_amount = isset($row['reserve_amount']) ? (float)$row['reserve_amount'] : 0.00;
+//   $cadence = (string)($row['cadence'] ?? '');
+//   $reserve_style = (string)($row['reserve_style'] ?? 'sinking_fund');
+//   $default_amount = (float)($row['default_amount'] ?? 0);
+//   $next_due_date = (string)($row['next_due_date'] ?? '');
+//   $reserve_amount = isset($row['reserve_amount']) ? (float)$row['reserve_amount'] : 0.00;
 
-  if ($reserve_style === 'manual_reserve') {
-    return round($reserve_amount, 2);
-  }
+//   if ($reserve_style === 'manual_reserve') {
+//     return round($reserve_amount, 2);
+//   }
 
-  if ($cadence === 'monthly' && $reserve_style === 'sinking_fund') {
-    $cycles = count_prepaid_monthly_cycles($next_due_date, $today);
-    return round($default_amount * $cycles, 2);
-  }
+//   if ($cadence === 'monthly' && $reserve_style === 'sinking_fund') {
+//     $cycles = count_prepaid_monthly_cycles($next_due_date, $today);
+//     return round($default_amount * $cycles, 2);
+//   }
 
-  if ($cadence === 'annual' && $reserve_style === 'prepaid') {
-    return 0.00;
-  }
+//   if ($cadence === 'annual' && $reserve_style === 'prepaid') {
+//     return 0.00;
+//   }
 
-  return 0.00;
-}
+//   return 0.00;
+// }
 
 function payment_amount_for_bill(array $bill, int $cycles_paid = 1): float
 {
@@ -560,6 +560,9 @@ function first_projected_due_date(array $bill, DateTime $today): ?DateTime
 
 
 
+
+
+
 function generate_projected_bill_events(array $rows, int $months_ahead = 12): array
 {
   $events = [];
@@ -570,13 +573,8 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
   $end_date->modify('+' . $months_ahead . ' months');
 
   foreach ($rows as $row) {
-    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
     $base_amount = base_amount_for_bill($row);
     $cycle_months = months_to_advance_for_bill($row, 1);
-
-    if ($paid_from !== 'paypal') {
-      continue;
-    }
 
     if ($base_amount <= 0) {
       continue;
@@ -832,9 +830,9 @@ function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
   foreach ($bills as $bill) {
     $paid_from = strtolower(trim((string)($bill['paid_from_account'] ?? '')));
 
-    if ($paid_from !== 'paypal') {
-      continue;
-    }
+    // if ($paid_from !== 'paypal') {
+    //   continue;
+    // }
 
     $actual_due = trim((string)$bill['actual_due_date']);
     if ($actual_due === '') {
@@ -880,3 +878,66 @@ function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
   ];
 }
 
+
+
+
+
+function reserve_totals_by_funding_account(array $rows): array
+{
+  $totals = [];
+
+  foreach ($rows as $row) {
+    $account_name = trim((string)($row['paid_from_account'] ?? ''));
+    $reserve_balance = isset($row['reserve_balance']) ? (float)$row['reserve_balance'] : 0.00;
+
+    if ($account_name === '') {
+      $account_name = 'Unassigned';
+    }
+
+    if (!isset($totals[$account_name])) {
+      $totals[$account_name] = 0.00;
+    }
+
+    $totals[$account_name] += $reserve_balance;
+  }
+
+  foreach ($totals as $account_name => $amount) {
+    $totals[$account_name] = round($amount, 2);
+  }
+
+  ksort($totals, SORT_NATURAL | SORT_FLAG_CASE);
+
+  return $totals;
+}
+
+function reserve_total_for_funding_account(array $rows, string $target_account_name): float
+{
+  $total = 0.00;
+  $target = strtolower(trim($target_account_name));
+
+  foreach ($rows as $row) {
+    $account_name = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+
+    if ($account_name === $target) {
+      $total += (float)($row['reserve_balance'] ?? 0);
+    }
+  }
+
+  return round($total, 2);
+}
+
+function filter_rows_by_funding_account(array $rows, string $target_account_name): array
+{
+  $filtered = [];
+  $target = strtolower(trim($target_account_name));
+
+  foreach ($rows as $row) {
+    $account_name = strtolower(trim((string)($row['paid_from_account'] ?? '')));
+
+    if ($account_name === $target) {
+      $filtered[] = $row;
+    }
+  }
+
+  return $filtered;
+}

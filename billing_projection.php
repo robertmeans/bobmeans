@@ -5,8 +5,10 @@ require '_functions/billing_functions.php';
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
+$selected_account = isset($_GET['account']) ? trim($_GET['account']) : 'PayPal';
 
-$reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
+// $reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
+reconcile_due_bills_against_reserves($pdo_db, $user_id);
 
 $stmt = $pdo_db->prepare("
   SELECT
@@ -35,10 +37,18 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$pool_amount = pooled_paypal_balance($rows);
-$months_ahead = 12;
+$reserve_totals = reserve_totals_by_funding_account($rows);
 
-$events = generate_projected_bill_events($rows, $months_ahead);
+if (!isset($reserve_totals[$selected_account])) {
+  $account_names = array_keys($reserve_totals);
+  $selected_account = !empty($account_names) ? $account_names[0] : 'PayPal';
+}
+
+$projection_rows = filter_rows_by_funding_account($rows, $selected_account);
+$pool_amount = reserve_total_for_funding_account($rows, $selected_account);
+
+$months_ahead = 12;
+$events = generate_projected_bill_events($projection_rows, $months_ahead);
 $projection = apply_pool_to_projected_events($events, $pool_amount);
 
 require '_includes/header.php';
@@ -49,6 +59,19 @@ require '_includes/nav.php';
   <div class="billing-schedule">
 
     <?php /* <h1>Billing Projection</h1> */ ?>
+
+    <form method="get" style="margin-bottom: 1em;">
+      <label for="account"><strong>Projection Account:</strong></label>
+      <select id="account" name="account" onchange="this.form.submit()">
+        <?php foreach ($reserve_totals as $account_name => $amount): ?>
+          <option value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>" <?php echo ($selected_account === $account_name) ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <noscript><button type="submit">View</button></noscript>
+    </form>
+
 
 
       <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
@@ -62,11 +85,33 @@ require '_includes/nav.php';
 
 
 
+<?php /*
     <div class="paypal-running-balance inner-links top">
       <a href="billing_schedule.php">Schedule</a> | 
       <strong style="margin-left:1em;">Pooled PayPal Reserve:</strong>
       &nbsp;&nbsp;$<?php echo number_format($projection['starting_pool'], 2); ?>
     </div>
+*/ ?>
+
+
+      <div class="paypal-running-balance">
+        <?php foreach ($reserve_totals as $account_name => $amount): ?>
+          <div>
+            <strong>
+              <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
+              <?php echo ($selected_account === $account_name) ? ' (selected)' : ''; ?>:
+            </strong>
+            $<?php echo number_format($amount, 2); ?>
+          </div>
+        <?php endforeach; ?>
+
+        <div style="margin-top: 0.5em;">
+          <strong>Pooled Reserve Used In Projection:</strong>
+          $<?php echo number_format($projection['starting_pool'], 2); ?>
+        </div>
+      </div>
+
+
 
     <table>
       <thead>

@@ -130,9 +130,9 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $errors[] = 'Amount due is required and must be numeric.';
   }
 
-  if ($annual_cost !== '' && !is_numeric($annual_cost)) {
-    $errors[] = 'Annual cost must be numeric if provided.';
-  }
+  // if ($annual_cost !== '' && !is_numeric($annual_cost)) {
+  //   $errors[] = 'Annual cost must be numeric if provided.';
+  // }
 
   if ($due_day_of_month === '' || !ctype_digit((string)$due_day_of_month) || (int)$due_day_of_month < 1 || (int)$due_day_of_month > 31) {
     $errors[] = 'Due day of month must be between 1 and 31.';
@@ -313,237 +313,214 @@ require '_includes/nav.php';
       </div>
     <?php endif; ?>
 
+      <form method="post">
+        <input type="hidden" name="create_billing_account" value="1">
 
+        <div class="two-col">
+          <div class="row">
+            <label for="billing_name">Billing Account Name</label>
+            <input
+              type="text"
+              id="billing_name"
+              name="billing_name"
+              value="<?php echo htmlspecialchars($billing_name, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
 
+          <div class="row">
+            <label for="vendor_name">Vendor Name</label>
+            <input
+              type="text"
+              id="vendor_name"
+              name="vendor_name"
+              value="<?php echo htmlspecialchars($vendor_name, ENT_QUOTES, 'UTF-8'); ?>"
+            >
+          </div>
+        </div>
 
+        <div class="two-col">
+          <div class="row">
+            <label for="cadence">Cadence</label>
+            <select id="cadence" name="cadence">
+              <option value="monthly" <?php echo ($cadence === 'monthly') ? 'selected' : ''; ?>>Monthly</option>
+              <option value="annual" <?php echo ($cadence === 'annual') ? 'selected' : ''; ?>>Annual</option>
+              <option value="custom" <?php echo ($cadence === 'custom') ? 'selected' : ''; ?>>Custom</option>
+            </select>
+          </div>
 
+          <div class="row">
+            <label for="renewal_term_months">Renewal Term (Months)</label>
+            <input
+              type="number"
+              id="renewal_term_months"
+              name="renewal_term_months"
+              min="1"
+              value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
+        </div>
 
+        <div class="two-col">
+          <div class="row">
+            <label for="next_due_date">Next Due Date</label>
+            <input
+              type="date"
+              id="next_due_date"
+              name="next_due_date"
+              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
 
+          <div class="row">
+            <label for="actual_due_date">Actual Due Date</label>
+            <input
+              type="date"
+              id="actual_due_date"
+              name="actual_due_date"
+              value="<?php echo htmlspecialchars($actual_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
+        </div>
 
+        <div class="two-col">
+          <div class="row" id="due-month-wrap">
+            <label for="due_month_of_year">Due Month of Year</label>
+            <input
+              type="number"
+              id="due_month_of_year"
+              name="due_month_of_year"
+              min="1"
+              max="12"
+              value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>"
+            >
+          </div>
 
+          <div class="row">
+            <label for="due_day_of_month">Due Day of Month</label>
+            <input
+              type="number"
+              id="due_day_of_month"
+              name="due_day_of_month"
+              min="1"
+              max="31"
+              value="<?php echo htmlspecialchars((string)$due_day_of_month, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
+        </div>
 
+        <div class="two-col">
+          <div class="row">
+            <label for="default_amount">Amount Due</label>
+            <input
+              type="number"
+              step="0.01"
+              id="default_amount"
+              name="default_amount"
+              value="<?php echo htmlspecialchars($default_amount, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
 
+          <div class="row">
+            <label for="reserve_balance">In Reserves</label>
+            <input
+              type="number"
+              step="0.01"
+              id="reserve_balance"
+              name="reserve_balance"
+              value="<?php echo htmlspecialchars($reserve_balance, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
+        </div>
 
+        <div class="two-col">
+          <div class="row">
+            <label for="default_funding_account_id">Paid From Account</label>
+            <select id="default_funding_account_id" name="default_funding_account_id">
+              <option value="">-- Select --</option>
+              <?php foreach ($funding_accounts as $funding): ?>
+                <option value="<?php echo (int)$funding['funding_account_id']; ?>" <?php echo ((string)$default_funding_account_id === (string)$funding['funding_account_id']) ? 'selected' : ''; ?>>
+                  <?php echo htmlspecialchars($funding['account_name'], ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
+          <div class="row">
+            <label for="reserve_style">Reserve Style</label>
+            <select id="reserve_style" name="reserve_style">
+              <option value="sinking_fund" <?php echo ($reserve_style === 'sinking_fund') ? 'selected' : ''; ?>>Sinking Fund</option>
+              <option value="prepaid" <?php echo ($reserve_style === 'prepaid') ? 'selected' : ''; ?>>Prepaid</option>
+            </select>
+          </div>
+        </div>
 
-<form method="post">
-  <input type="hidden" name="create_billing_account" value="1">
+<?php if (false): /* not sure how/why/if needed */ ?>
+        <div class="two-col">
+          <div class="row">
+            <label for="transfer_from_funding_account_id">Transferred From Account</label>
+            <select id="transfer_from_funding_account_id" name="transfer_from_funding_account_id">
+              <option value="">-- Select --</option>
+              <?php foreach ($funding_accounts as $funding): ?>
+                <option value="<?php echo (int)$funding['funding_account_id']; ?>" <?php echo ((string)$transfer_from_funding_account_id === (string)$funding['funding_account_id']) ? 'selected' : ''; ?>>
+                  <?php echo htmlspecialchars($funding['account_name'], ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
 
-  <div class="two-col">
-    <div class="row">
-      <label for="billing_name">Billing Account Name</label>
-      <input
-        type="text"
-        id="billing_name"
-        name="billing_name"
-        value="<?php echo htmlspecialchars($billing_name, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
+          <div class="row">
+            <label for="sort_order">Sort Order</label>
+            <input
+              type="number"
+              id="sort_order"
+              name="sort_order"
+              min="0"
+              value="<?php echo htmlspecialchars((string)$sort_order, ENT_QUOTES, 'UTF-8'); ?>"
+            >
+          </div>
+        </div>
+<?php endif; ?>        
 
-    <div class="row">
-      <label for="vendor_name">Vendor Name</label>
-      <input
-        type="text"
-        id="vendor_name"
-        name="vendor_name"
-        value="<?php echo htmlspecialchars($vendor_name, ENT_QUOTES, 'UTF-8'); ?>"
-      >
-    </div>
-  </div>
+        <div class="row standalone">
+          <label for="intake_note">Billing Memo</label>
+          <input
+            type="text"
+            id="intake_note"
+            class="memo"
+            name="intake_note"
+            value="<?php echo htmlspecialchars($intake_note, ENT_QUOTES, 'UTF-8'); ?>"
+          >
+        </div>
 
-  <div class="two-col">
-    <div class="row">
-      <label for="cadence">Cadence</label>
-      <select id="cadence" name="cadence">
-        <option value="monthly" <?php echo ($cadence === 'monthly') ? 'selected' : ''; ?>>Monthly</option>
-        <option value="annual" <?php echo ($cadence === 'annual') ? 'selected' : ''; ?>>Annual</option>
-        <option value="custom" <?php echo ($cadence === 'custom') ? 'selected' : ''; ?>>Custom</option>
-      </select>
-    </div>
+        <div class="checks">
+          <label>
+            <input type="checkbox" name="is_autopay" value="1" <?php echo $is_autopay ? 'checked' : ''; ?>>
+            Auto Pay
+          </label>
 
-    <div class="row">
-      <label for="reserve_style">Reserve Style</label>
-      <select id="reserve_style" name="reserve_style">
-        <option value="sinking_fund" <?php echo ($reserve_style === 'sinking_fund') ? 'selected' : ''; ?>>Sinking Fund</option>
-        <option value="prepaid" <?php echo ($reserve_style === 'prepaid') ? 'selected' : ''; ?>>Prepaid</option>
-      </select>
-    </div>
-  </div>
+          <label>
+            <input type="checkbox" name="auto_advance_on_payment" value="1" <?php echo $auto_advance_on_payment ? 'checked' : ''; ?>>
+            Auto Advance on Payment
+          </label>
 
-  <div class="two-col">
-    <div class="row">
-      <label for="default_amount">Amount Due</label>
-      <input
-        type="number"
-        step="0.01"
-        id="default_amount"
-        name="default_amount"
-        value="<?php echo htmlspecialchars($default_amount, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
+          <label>
+            <input type="checkbox" name="is_active" value="1" <?php echo $is_active ? 'checked' : ''; ?>>
+            Active
+          </label>
+        </div>
 
-    <div class="row">
-      <label for="reserve_balance">In Reserves</label>
-      <input
-        type="number"
-        step="0.01"
-        id="reserve_balance"
-        name="reserve_balance"
-        value="<?php echo htmlspecialchars($reserve_balance, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
-  </div>
-
-  <div class="two-col">
-    <div class="row">
-      <label for="next_due_date">Next Due Date</label>
-      <input
-        type="date"
-        id="next_due_date"
-        name="next_due_date"
-        value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
-
-    <div class="row">
-      <label for="actual_due_date">Actual Due Date</label>
-      <input
-        type="date"
-        id="actual_due_date"
-        name="actual_due_date"
-        value="<?php echo htmlspecialchars($actual_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
-  </div>
-
-  <div class="two-col">
-    <div class="row">
-      <label for="renewal_term_months">Renewal Term (Months)</label>
-      <input
-        type="number"
-        id="renewal_term_months"
-        name="renewal_term_months"
-        min="1"
-        value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
-
-    <div class="row">
-      <label for="due_day_of_month">Due Day of Month</label>
-      <input
-        type="number"
-        id="due_day_of_month"
-        name="due_day_of_month"
-        min="1"
-        max="31"
-        value="<?php echo htmlspecialchars((string)$due_day_of_month, ENT_QUOTES, 'UTF-8'); ?>"
-        required
-      >
-    </div>
-  </div>
-
-  <div class="two-col">
-    <div class="row" id="due-month-wrap">
-      <label for="due_month_of_year">Due Month of Year</label>
-      <input
-        type="number"
-        id="due_month_of_year"
-        name="due_month_of_year"
-        min="1"
-        max="12"
-        value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>"
-      >
-    </div>
-
-    <div class="row">
-      <label for="default_funding_account_id">Paid From Account</label>
-      <select id="default_funding_account_id" name="default_funding_account_id">
-        <option value="">-- Select --</option>
-        <?php foreach ($funding_accounts as $funding): ?>
-          <option value="<?php echo (int)$funding['funding_account_id']; ?>" <?php echo ((string)$default_funding_account_id === (string)$funding['funding_account_id']) ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($funding['account_name'], ENT_QUOTES, 'UTF-8'); ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-  </div>
-
-  <div class="two-col">
-    <div class="row">
-      <label for="transfer_from_funding_account_id">Transferred From Account</label>
-      <select id="transfer_from_funding_account_id" name="transfer_from_funding_account_id">
-        <option value="">-- Select --</option>
-        <?php foreach ($funding_accounts as $funding): ?>
-          <option value="<?php echo (int)$funding['funding_account_id']; ?>" <?php echo ((string)$transfer_from_funding_account_id === (string)$funding['funding_account_id']) ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($funding['account_name'], ENT_QUOTES, 'UTF-8'); ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-
-    <div class="row">
-      <label for="sort_order">Sort Order</label>
-      <input
-        type="number"
-        id="sort_order"
-        name="sort_order"
-        min="0"
-        value="<?php echo htmlspecialchars((string)$sort_order, ENT_QUOTES, 'UTF-8'); ?>"
-      >
-    </div>
-  </div>
-
-  <div class="row standalone">
-    <label for="intake_note">Billing Memo</label>
-    <input
-      type="text"
-      id="intake_note"
-      class="memo"
-      name="intake_note"
-      value="<?php echo htmlspecialchars($intake_note, ENT_QUOTES, 'UTF-8'); ?>"
-    >
-  </div>
-
-  <div class="checks">
-    <label>
-      <input type="checkbox" name="is_autopay" value="1" <?php echo $is_autopay ? 'checked' : ''; ?>>
-      Auto Pay
-    </label>
-
-    <label>
-      <input type="checkbox" name="auto_advance_on_payment" value="1" <?php echo $auto_advance_on_payment ? 'checked' : ''; ?>>
-      Auto Advance on Payment
-    </label>
-
-    <label>
-      <input type="checkbox" name="is_active" value="1" <?php echo $is_active ? 'checked' : ''; ?>>
-      Active
-    </label>
-  </div>
-
-  <div class="form-actions">
-    <button type="submit" name="save_billing_account" value="1">Add New Account</button>
-    <button type="submit" name="save_and_duplicate_again" value="1">Add + Duplicate</button>
-  </div>
-</form>
-
-
-
-
-
-
-
-
-
-
-
-
+        <div class="form-actions">
+          <button type="submit" name="save_billing_account" value="1">Add New Account</button>
+          <button type="submit" name="save_and_duplicate_again" value="1">Add + Duplicate</button>
+        </div>
+      </form>
 
     <div class="inner-links">
       <a href="billing_schedule.php">Schedule</a> | <a href="billing_projection.php">Projection</a> | <a href="intake_funding-accounts.php">New Funding</a>

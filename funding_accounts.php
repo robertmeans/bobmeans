@@ -43,6 +43,7 @@ require '_includes/nav.php';
       <tbody>
 
       <?php foreach ($rows as $row): ?>
+
         <tr class="<?php echo ((int)$row['is_active'] === 1) ? 'active-row' : 'inactive-row'; ?>">
           <td><?php echo htmlspecialchars($row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>
 
@@ -52,7 +53,7 @@ require '_includes/nav.php';
 
           <td><?php echo ((int)$row['is_active'] === 1) ? 'Yes' : 'No'; ?></td>
 
-          <td><?php echo htmlspecialchars((string)$row['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+          <td><?php echo date("m.d.y \\a\\t H:i", strtotime(htmlspecialchars((string)$row['created_at'], ENT_QUOTES, 'UTF-8'))); ?></td>
 
           <td>
             <a href="edit_funding-account.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Edit</a>
