@@ -1,5 +1,4 @@
-      <h1>Login</h1>
-
+      <?php /* <h1>Login</h1> */ ?>
       <?php require '_includes/auth-comm.php'; ?>
 
       <div id="formcon">

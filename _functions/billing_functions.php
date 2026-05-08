@@ -393,6 +393,9 @@ function add_months_to_date(string $date_string, int $months): string
   return $date->format('Y-m-d');
 }
 
+
+
+
 function months_to_advance_for_bill(array $bill, int $cycles = 1): int
 {
   $renewal_term_months = isset($bill['renewal_term_months'])
@@ -405,6 +408,10 @@ function months_to_advance_for_bill(array $bill, int $cycles = 1): int
 
   return $renewal_term_months * $cycles;
 }
+
+
+
+
 
 function projected_actual_due_date(array $bill): string
 {
@@ -426,10 +433,14 @@ function projected_actual_due_date(array $bill): string
   return add_months_to_date($next_due_date, -$months_back);
 }
 
+
 function base_amount_for_bill(array $bill): float
 {
   return round((float)($bill['default_amount'] ?? 0), 2);
 }
+
+
+
 
 function pooled_paypal_balance(array $rows): float
 {
@@ -445,6 +456,11 @@ function pooled_paypal_balance(array $rows): float
 
   return round($total, 2);
 }
+
+
+
+
+
 
 function safe_day_for_month(int $year, int $month, int $day): int
 {
@@ -516,32 +532,33 @@ function next_annual_occurrence_from_anchor(int $due_month_of_year, int $due_day
   return $candidate;
 }
 
+
+
+
 function first_projected_due_date(array $bill, DateTime $today): ?DateTime
 {
-  $cadence = (string)($bill['cadence'] ?? '');
-  $due_day_of_month = isset($bill['due_day_of_month']) ? (int)$bill['due_day_of_month'] : 0;
-  $next_due_date = trim((string)($bill['next_due_date'] ?? ''));
+  $actual_due_date = trim((string)($bill['actual_due_date'] ?? ''));
 
-  if ($cadence === 'monthly') {
-    return next_monthly_occurrence_from_anchor($due_day_of_month, $today);
+  if ($actual_due_date === '') {
+    return null;
   }
 
-  if ($cadence === 'annual') {
-    if ($next_due_date === '') {
-      return null;
-    }
-
-    try {
-      $stored_next_due = new DateTime($next_due_date);
-      $stored_next_due->setTime(0, 0, 0);
-      return $stored_next_due;
-    } catch (Exception $e) {
-      return null;
-    }
+  try {
+    $stored_actual_due = new DateTime($actual_due_date);
+    $stored_actual_due->setTime(0, 0, 0);
+    return $stored_actual_due;
+  } catch (Exception $e) {
+    return null;
   }
-
-  return null;
 }
+
+
+
+
+
+
+
+
 
 function generate_projected_bill_events(array $rows, int $months_ahead = 12): array
 {
@@ -555,7 +572,6 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
   foreach ($rows as $row) {
     $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
     $base_amount = base_amount_for_bill($row);
-    $cadence = (string)($row['cadence'] ?? '');
     $cycle_months = months_to_advance_for_bill($row, 1);
 
     if ($paid_from !== 'paypal') {
@@ -578,7 +594,7 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
         'billing_name' => (string)$row['billing_name'],
         'vendor_name' => (string)($row['vendor_name'] ?? ''),
         'intake_note' => (string)($row['intake_note'] ?? ''),
-        'cadence' => $cadence,
+        'cadence' => (string)($row['cadence'] ?? ''),
         'due_date' => $cursor->format('Y-m-d'),
         'amount' => $base_amount,
         'paid_from_account' => (string)($row['paid_from_account'] ?? '')
@@ -598,6 +614,16 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
 
   return $events;
 }
+
+
+
+
+
+
+
+
+
+
 
 function apply_pool_to_projected_events(array $events, float $pool_amount): array
 {
@@ -638,3 +664,219 @@ function apply_pool_to_projected_events(array $events, float $pool_amount): arra
     'ending_pool' => round($remaining_pool, 2)
   ];
 }
+
+
+function payment_already_recorded(PDO $pdo_db, int $billing_account_id, int $user_id, string $due_date): bool
+{
+  $stmt = $pdo_db->prepare("
+    SELECT bill_payment_id
+    FROM bill_payments
+    WHERE billing_account_id = ?
+      AND user_id = ?
+      AND due_date = ?
+      AND status = 'paid'
+    LIMIT 1
+  ");
+  $stmt->execute([$billing_account_id, $user_id, $due_date]);
+
+  return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): bool
+{
+  $billing_account_id = (int)$bill['billing_account_id'];
+  $user_id = (int)$bill['user_id'];
+  $amount = base_amount_for_bill($bill);
+  $reserve_balance = round((float)($bill['reserve_balance'] ?? 0), 2);
+
+  if ($amount <= 0) {
+    return false;
+  }
+
+  if ($reserve_balance < $amount) {
+    return false;
+  }
+
+  if (payment_already_recorded($pdo_db, $billing_account_id, $user_id, $due_date)) {
+    return false;
+  }
+
+  $new_reserve_balance = round($reserve_balance - $amount, 2);
+  if ($new_reserve_balance < 0) {
+    $new_reserve_balance = 0.00;
+  }
+
+  $months_to_advance = months_to_advance_for_bill($bill, 1);
+
+  $next_actual_due = new DateTime($due_date);
+  $next_actual_due->setTime(0, 0, 0);
+  $next_actual_due->modify('+' . $months_to_advance . ' months');
+
+  $pdo_db->beginTransaction();
+
+  try {
+    $stmt = $pdo_db->prepare("
+      INSERT INTO bill_payments (
+        billing_account_id,
+        user_id,
+        due_date,
+        amount_due,
+        amount_paid,
+        date_paid,
+        funding_account_id,
+        transfer_from_funding_account_id,
+        status,
+        confirmation_note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([
+      $billing_account_id,
+      $user_id,
+      $due_date,
+      $amount,
+      $amount,
+      $due_date,
+      $bill['default_funding_account_id'] !== null ? (int)$bill['default_funding_account_id'] : null,
+      $bill['transfer_from_funding_account_id'] !== null ? (int)$bill['transfer_from_funding_account_id'] : null,
+      'paid',
+      'Auto-deducted from reserve'
+    ]);
+
+    $stmt = $pdo_db->prepare("
+      INSERT INTO bill_reserve_transactions (
+        billing_account_id,
+        user_id,
+        transaction_type,
+        amount,
+        transaction_date,
+        note
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([
+      $billing_account_id,
+      $user_id,
+      'deduction',
+      $amount,
+      $due_date . ' 00:00:00',
+      'Automatic draft deduction'
+    ]);
+
+    $stmt = $pdo_db->prepare("
+      UPDATE billing_accounts
+      SET
+        reserve_balance = ?,
+        actual_due_date = ?,
+        updated_at = NOW()
+      WHERE billing_account_id = ?
+        AND user_id = ?
+      LIMIT 1
+    ");
+    $stmt->execute([
+      $new_reserve_balance,
+      $next_actual_due->format('Y-m-d'),
+      $billing_account_id,
+      $user_id
+    ]);
+
+    $pdo_db->commit();
+    return true;
+  } catch (Exception $e) {
+    if ($pdo_db->inTransaction()) {
+      $pdo_db->rollBack();
+    }
+
+    error_log('Reserve draft reconciliation failed for billing_account_id ' . $billing_account_id . ': ' . $e->getMessage());
+    return false;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
+{
+  $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
+  $stmt = $pdo_db->prepare("
+    SELECT
+      ba.*,
+      fa.account_name AS paid_from_account
+    FROM billing_accounts ba
+    LEFT JOIN funding_accounts fa
+      ON ba.default_funding_account_id = fa.funding_account_id
+    WHERE ba.user_id = ?
+      AND ba.is_active = 1
+      AND ba.actual_due_date IS NOT NULL
+    ORDER BY ba.actual_due_date ASC, ba.billing_account_id ASC
+  ");
+  $stmt->execute([$user_id]);
+  $bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $processed_count = 0;
+  $skipped_count = 0;
+
+  foreach ($bills as $bill) {
+    $paid_from = strtolower(trim((string)($bill['paid_from_account'] ?? '')));
+
+    if ($paid_from !== 'paypal') {
+      continue;
+    }
+
+    $actual_due = trim((string)$bill['actual_due_date']);
+    if ($actual_due === '') {
+      continue;
+    }
+
+    $cursor = new DateTime($actual_due);
+    $cursor->setTime(0, 0, 0);
+
+    while ($cursor < $today) {
+      $processed = process_single_due_draft($pdo_db, $bill, $cursor->format('Y-m-d'));
+
+      if ($processed) {
+        $processed_count++;
+
+        $stmt = $pdo_db->prepare("
+          SELECT *
+          FROM billing_accounts
+          WHERE billing_account_id = ?
+            AND user_id = ?
+          LIMIT 1
+        ");
+        $stmt->execute([(int)$bill['billing_account_id'], $user_id]);
+        $refreshed = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$refreshed || empty($refreshed['actual_due_date'])) {
+          break;
+        }
+
+        $bill = array_merge($bill, $refreshed);
+        $cursor = new DateTime($bill['actual_due_date']);
+        $cursor->setTime(0, 0, 0);
+      } else {
+        $skipped_count++;
+        break;
+      }
+    }
+  }
+
+  return [
+    'processed_count' => $processed_count,
+    'skipped_count' => $skipped_count
+  ];
+}
+

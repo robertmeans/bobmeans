@@ -289,7 +289,7 @@ require '_includes/nav.php';
 
       <div class="inner-links">
         <a href="billing_schedule.php">Billing Schedule</a> |
-        <a href="billing_projections.php">Billing Projection</a> |
+        <a href="billing_projection.php">Billing Projection</a> |
         <a href="billing_accounts.php">All Billing Accounts</a> |
         <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$bill['billing_account_id']; ?>">Edit This Bill</a> |
         <a href="contribute_to_reserve.php?billing_account_id=<?php echo (int)$bill['billing_account_id']; ?>">Contribute</a>

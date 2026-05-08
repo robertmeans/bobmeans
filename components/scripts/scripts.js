@@ -53,3 +53,37 @@ $(document).on("click", function() {
     closeNav();
   }
 });
+
+
+
+
+
+
+
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const cadence = document.getElementById('cadence');
+    const dueMonthWrap = document.getElementById('due-month-wrap');
+    const dueMonthInput = document.getElementById('due_month_of_year');
+    const renewalTermInput = document.getElementById('renewal_term_months');
+
+    function syncCadenceFields() {
+      const value = cadence.value;
+
+      if (value === 'monthly') {
+        dueMonthWrap.style.display = 'none';
+        dueMonthInput.value = '';
+        renewalTermInput.value = '1';
+      } else if (value === 'annual') {
+        dueMonthWrap.style.display = '';
+        renewalTermInput.value = '12';
+      } else {
+        dueMonthWrap.style.display = '';
+      }
+    }
+
+    if (cadence && dueMonthWrap && dueMonthInput && renewalTermInput) {
+      cadence.addEventListener('change', syncCadenceFields);
+      syncCadenceFields();
+    }
+  });

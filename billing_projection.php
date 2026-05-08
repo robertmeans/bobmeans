@@ -6,6 +6,8 @@ require '_functions/billing_functions.php';
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
 
+$reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
+
 $stmt = $pdo_db->prepare("
   SELECT
     ba.billing_account_id,
@@ -17,6 +19,7 @@ $stmt = $pdo_db->prepare("
     ba.default_amount,
     ba.reserve_balance,
     ba.next_due_date,
+    ba.actual_due_date,
     ba.renewal_term_months,
     ba.due_day_of_month,
     ba.due_month_of_year,
@@ -46,6 +49,18 @@ require '_includes/nav.php';
   <div class="billing-schedule">
 
     <?php /* <h1>Billing Projection</h1> */ ?>
+
+
+      <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
+        <div class="success" style="display:block;">
+          Processed: <?php echo (int)$reconciliation['processed_count']; ?>
+          <?php if (!empty($reconciliation['skipped_count'])): ?>
+            | Skipped: <?php echo (int)$reconciliation['skipped_count']; ?>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+
+
 
     <div class="paypal-running-balance inner-links top">
       <a href="billing_schedule.php">Schedule</a> | 

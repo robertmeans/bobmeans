@@ -51,6 +51,7 @@ require '_includes/nav.php';
           <th>Paid From</th>
           <th>Active</th>
           <th>Edit</th>
+          <th>Duplicate</th>
         </tr>
       </thead>
       <tbody>
@@ -89,6 +90,12 @@ require '_includes/nav.php';
           <td>
             <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Edit</a>
           </td>
+
+          <td>
+            <a href="intake_billing-accounts.php?duplicate_billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Duplicate</a>
+          </td>
+
+          
         </tr>
       <?php endforeach; ?>
 
@@ -97,7 +104,7 @@ require '_includes/nav.php';
 
     <div class="inner-links">
       <a href="billing_schedule.php">Billing Schedule</a> |
-      <a href="billing_projections.php">Billing Projection</a> |
+      <a href="billing_projection.php">Billing Projection</a> |
       <a href="intake_billing-accounts.php">New Bill</a>
     </div>
 

@@ -57,6 +57,7 @@ $reserve_style = $billing_account['reserve_style'] ?? 'sinking_fund';
 $default_amount = isset($billing_account['default_amount']) ? (string)$billing_account['default_amount'] : '';
 $reserve_balance = isset($billing_account['reserve_balance']) ? (string)$billing_account['reserve_balance'] : '0.00';
 $next_due_date = $billing_account['next_due_date'] ?? '';
+$actual_due_date = $billing_account['actual_due_date'] ?? '';
 $renewal_term_months = isset($billing_account['renewal_term_months']) ? (string)$billing_account['renewal_term_months'] : '1';
 $due_day_of_month = isset($billing_account['due_day_of_month']) ? (string)$billing_account['due_day_of_month'] : '';
 $due_month_of_year = isset($billing_account['due_month_of_year']) ? (string)$billing_account['due_month_of_year'] : '';
@@ -77,6 +78,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
   $default_amount = trim($_POST['default_amount'] ?? '');
   $reserve_balance = trim($_POST['reserve_balance'] ?? '0.00');
   $next_due_date = trim($_POST['next_due_date'] ?? '');
+  $actual_due_date = trim($_POST['actual_due_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '1');
   $due_day_of_month = trim($_POST['due_day_of_month'] ?? '');
   $due_month_of_year = trim($_POST['due_month_of_year'] ?? '');
@@ -109,6 +111,10 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
 
   if ($next_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
     $errors[] = 'Next due date must be in YYYY-MM-DD format.';
+  }
+
+  if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
+    $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
   }
 
   if ($renewal_term_months === '' || !ctype_digit((string)$renewal_term_months) || (int)$renewal_term_months < 1) {
@@ -156,29 +162,30 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
 
   if (!$errors) {
     $stmt = $pdo_db->prepare("
-      UPDATE billing_accounts
-      SET
-        billing_name = ?,
-        vendor_name = ?,
-        intake_note = ?,
-        cadence = ?,
-        reserve_style = ?,
-        default_amount = ?,
-        reserve_balance = ?,
-        next_due_date = ?,
-        renewal_term_months = ?,
-        due_day_of_month = ?,
-        due_month_of_year = ?,
-        default_funding_account_id = ?,
-        transfer_from_funding_account_id = ?,
-        is_autopay = ?,
-        auto_advance_on_payment = ?,
-        is_active = ?,
-        sort_order = ?,
-        updated_at = NOW()
-      WHERE billing_account_id = ?
-        AND user_id = ?
-      LIMIT 1
+    UPDATE billing_accounts
+    SET
+      billing_name = ?,
+      vendor_name = ?,
+      intake_note = ?,
+      cadence = ?,
+      reserve_style = ?,
+      default_amount = ?,
+      reserve_balance = ?,
+      next_due_date = ?,
+      actual_due_date = ?,
+      renewal_term_months = ?,
+      due_day_of_month = ?,
+      due_month_of_year = ?,
+      default_funding_account_id = ?,
+      transfer_from_funding_account_id = ?,
+      is_autopay = ?,
+      auto_advance_on_payment = ?,
+      is_active = ?,
+      sort_order = ?,
+      updated_at = NOW()
+    WHERE billing_account_id = ?
+      AND user_id = ?
+    LIMIT 1
     ");
 
     $stmt->execute([
@@ -190,6 +197,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       $default_amount,
       $reserve_balance,
       $next_due_date,
+      $actual_due_date,
       $renewal_term_months,
       $due_day_of_month,
       $due_month_of_year,
@@ -278,12 +286,35 @@ require '_includes/nav.php';
         <div class="two-col">
           <div class="row">
             <label for="next_due_date">Next Due Date</label>
-            <input type="date" id="next_due_date" name="next_due_date" value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>" required>
+            <input
+              type="date"
+              id="next_due_date"
+              name="next_due_date"
+              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
           </div>
 
           <div class="row">
+            <label for="actual_due_date">Actual Due Date</label>
+            <input
+              type="date"
+              id="actual_due_date"
+              name="actual_due_date"
+              value="<?php echo htmlspecialchars($actual_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="row">
             <label for="renewal_term_months">Renewal Term (Months)</label>
             <input type="number" id="renewal_term_months" name="renewal_term_months" min="1" value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>" required>
+          </div>
+
+          <div class="row">
+            &nbsp;
           </div>
         </div>
 
