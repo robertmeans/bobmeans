@@ -38,6 +38,7 @@
         <?php } ?>
       <?php } ?>
 
+      <a href="<?php echo WWW_ROOT; ?>">Dashboard</a>
       <a href="billing_schedule.php">Schedule</a>
       <a href="billing_projection.php">Projection</a>
       <a href="billing_accounts.php">Billing Accounts</a>
