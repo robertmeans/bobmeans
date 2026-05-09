@@ -5,6 +5,7 @@ require '_functions/billing_functions.php';
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'billAcccounts';
 
 $stmt = $pdo_db->prepare("
   SELECT

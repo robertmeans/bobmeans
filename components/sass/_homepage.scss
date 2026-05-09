@@ -80,3 +80,11 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.account-jump {
+  color: #313131;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}

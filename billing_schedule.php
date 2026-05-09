@@ -2,12 +2,10 @@
 require_once 'config/initialize.php';
 verify_loggedin();
 require '_functions/billing_functions.php';
-require '_includes/header.php';
-require '_includes/nav.php';
 
 $pdo_db = pdo_connect();
-
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'schedule';
 
 process_due_autopay_bills($pdo_db, $user_id);
 
@@ -58,6 +56,8 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $reserve_totals = reserve_totals_by_funding_account($rows);
 $paypal_target_balance = reserve_total_for_funding_account($rows, 'PayPal');
 
+require '_includes/header.php';
+require '_includes/nav.php';
 ?>
 
 

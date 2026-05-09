@@ -1,12 +1,10 @@
 <?php
 require_once 'config/initialize.php';
 verify_loggedin();
-require '_includes/header.php';
-require '_includes/nav.php';
 
 $pdo_db = pdo_connect();
-
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'intakeFunding';
 
 $errors = [];
 $success = '';
@@ -72,6 +70,9 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
     $is_active = 1;
   }
 }
+
+require '_includes/header.php';
+require '_includes/nav.php';
 ?>
 
 <div class="intake-form">

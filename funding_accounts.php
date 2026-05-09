@@ -4,6 +4,7 @@ verify_loggedin();
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'fundingAccts';
 
 $stmt = $pdo_db->prepare("
   SELECT

@@ -3,6 +3,7 @@ require '_functions/billing_functions.php';
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'dashboard';
 
 /*
   make sure past-due actual drafts are reconciled before
@@ -113,12 +114,23 @@ function homepage_amount_needed(array $row): float
   return round($remaining, 2);
 }
 
+
+
+
+
+
+
+
+
+
+
 function homepage_account_projection_summary(array $rows_for_account): array
 {
   if (!$rows_for_account) {
     return [
       'status' => 'empty',
-      'message' => 'No active bills assigned.'
+      'message' => 'No active bills assigned.',
+      'due_date' => null
     ];
   }
 
@@ -145,8 +157,9 @@ function homepage_account_projection_summary(array $rows_for_account): array
   if ($first_attention) {
     return [
       'status' => $first_attention['status'],
-      'message' => $first_attention['billing_name'] . ' on ' . date('m.d.y', strtotime($first_attention['due_date'])),
-      'remaining_due' => (float)$first_attention['remaining_due']
+      'message' => date('m.d.y', strtotime($first_attention['due_date'])) . ' - ' . $first_attention['billing_name'],
+      'remaining_due' => (float)$first_attention['remaining_due'],
+      'due_date' => $first_attention['due_date']
     ];
   }
 
@@ -155,15 +168,27 @@ function homepage_account_projection_summary(array $rows_for_account): array
 
     return [
       'status' => 'covered',
-      'message' => 'Covered through ' . date('m.d.y', strtotime($last_event['due_date']))
+      'message' => 'Covered through ' . date('m.d.y', strtotime($last_event['due_date'])),
+      'due_date' => $last_event['due_date']
     ];
   }
 
   return [
     'status' => 'empty',
-    'message' => 'No projected bill events.'
+    'message' => 'No projected bill events.',
+    'due_date' => null
   ];
 }
+
+
+
+
+
+
+
+
+
+
 
 $reserve_totals = homepage_reserve_totals($billing_rows, $funding_accounts);
 
@@ -185,7 +210,7 @@ foreach ($billing_rows as $row) {
 }
 
 /*
-  first problem per funding account
+  next up per funding account
 */
 $account_attention = [];
 $total_underfunded = 0.00;
@@ -212,6 +237,34 @@ foreach ($rows_by_account as $account_name => $rows_for_account) {
 }
 
 $total_underfunded = round($total_underfunded, 2);
+
+$account_attention_list = [];
+
+foreach ($account_attention as $account_name => $summary) {
+  $account_attention_list[] = [
+    'account_name' => $account_name,
+    'summary' => $summary
+  ];
+}
+
+usort($account_attention_list, function ($a, $b) {
+  $date_a = $a['summary']['due_date'] ?? null;
+  $date_b = $b['summary']['due_date'] ?? null;
+
+  if ($date_a === $date_b) {
+    return strcmp((string)$a['account_name'], (string)$b['account_name']);
+  }
+
+  if ($date_a === null) {
+    return 1;
+  }
+
+  if ($date_b === null) {
+    return -1;
+  }
+
+  return strcmp($date_a, $date_b);
+});
 
 /*
   uncovered / partial list across all accounts
@@ -311,28 +364,35 @@ require '_includes/nav.php';
       </div>
 
       <div class="dashboard-card">
-        <h2>Total Underfunded</h2>
+        <h2>Next Round Total</h2>
         <div class="dashboard-big">
           $<?php echo number_format($total_underfunded, 2); ?>
         </div>
       </div>
 
       <div class="dashboard-card">
-        <h2>First Problem Per Account</h2>
-        <?php if ($account_attention): ?>
-          <?php foreach ($account_attention as $account_name => $summary): ?>
-            <div class="dashboard-line">
-              <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong>
-              <?php if ($summary['status'] === 'partial'): ?>
+        <h2>Next Up Per Account</h2>
+        <?php if ($account_attention_list): ?>
+          <?php foreach ($account_attention_list as $item): ?>
+            <?php
+            $account_name = $item['account_name'];
+            $summary = $item['summary'];
+            ?>
+
+
+          <div class="dashboard-line <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
+            <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong>
+            <a class="account-jump" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">
+              <?php if ($summary['status'] === 'partial' || $summary['status'] === 'due'): ?>
                 <?php echo htmlspecialchars($summary['message'], ENT_QUOTES, 'UTF-8'); ?>
-                — needs $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
-              <?php elseif ($summary['status'] === 'due'): ?>
-                <?php echo htmlspecialchars($summary['message'], ENT_QUOTES, 'UTF-8'); ?>
-                — needs $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
+                - needs $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
               <?php else: ?>
                 <?php echo htmlspecialchars($summary['message'], ENT_QUOTES, 'UTF-8'); ?>
               <?php endif; ?>
-            </div>
+            </a>
+          </div>
+
+
           <?php endforeach; ?>
         <?php else: ?>
           <p>No active billing accounts found.</p>
@@ -354,7 +414,7 @@ require '_includes/nav.php';
     <div class="dashboard-grid lower-grid">
 
       <div class="dashboard-card wide-card">
-        <h2>Needs Attention</h2>
+        <h2>Next 10</h2>
 
         <?php if ($exceptions): ?>
           <table>

@@ -5,6 +5,7 @@ require '_functions/billing_functions.php';
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
+$layout_context = 'projection';
 $selected_account = isset($_GET['account']) ? trim($_GET['account']) : 'PayPal';
 
 // $reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
