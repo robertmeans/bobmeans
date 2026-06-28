@@ -113,7 +113,7 @@
   &.open {
     transform: translateX(0);
   }
-  a { 
+  a.sn { 
     cursor: pointer;
     width: 100%;
     display: flex;
@@ -214,4 +214,9 @@
       background-color: #ab0000;
     }
   }
+}
+
+.legacy {
+  margin-top: 2em;
+  border-top: 1px solid rgba(255,255,255,0.2);
 }

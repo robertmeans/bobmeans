@@ -66,7 +66,7 @@ require '_includes/nav.php';
 
     <?php /* <h1>Billing Schedule</h1> */ ?>
     <div class="inner-links top">
-      <a href="billing_projection.php">Projection</a>
+      Go to: <a href="billing_projection.php">Projection</a>
     </div>
 
     <table>

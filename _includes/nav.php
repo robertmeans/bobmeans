@@ -38,16 +38,22 @@
         <?php } ?>
       <?php } ?>
 
-      <a class="<?php if ($layout_context === 'dashboard') { echo 'active'; } ?>" href="<?php echo WWW_ROOT; ?>">Dashboard</a>
-      <a class="<?php if ($layout_context === 'schedule') { echo 'active'; } ?>" href="billing_schedule.php">Schedule</a>
-      <a class="<?php if ($layout_context === 'projection') { echo 'active'; } ?>" href="billing_projection.php">Projection</a>
-      <a class="<?php if ($layout_context === 'billAcccounts') { echo 'active'; } ?>" href="billing_accounts.php">Billing Accounts</a>
-      <a class="<?php if ($layout_context === 'intakeBilling') { echo 'active'; } ?>" href="intake_billing-accounts.php">Add New Bill</a>
-      <a class="<?php if ($layout_context === 'fundingAccts') { echo 'active'; } ?>" href="funding_accounts.php">Funding Accounts</a>
-      <a class="<?php if ($layout_context === 'intakeFunding') { echo 'active'; } ?>" href="intake_funding-accounts.php">Add New Funding</a>
+      <a class="sn <?php if ($layout_context === 'dashboard') { echo 'active'; } ?>" href="<?php echo WWW_ROOT; ?>">Dashboard</a>
+      
+      <a class="sn <?php if ($layout_context === 'projection') { echo 'active'; } ?>" href="billing_projection.php">Projection</a>
+      <a class="sn <?php if ($layout_context === 'adjustments') { echo 'active'; } ?>" href="reserve_adjustments.php">Reserve Adjustment</a>
+
+
+      <a class="sn <?php if ($layout_context === 'billAcccounts') { echo 'active'; } ?>" href="billing_accounts.php">Bills</a>
+      <a class="sn <?php if ($layout_context === 'fundingAccts') { echo 'active'; } ?>" href="funding_accounts.php">Funding Accounts</a>
+      <a class="sn <?php if ($layout_context === 'intakeBilling') { echo 'active'; } ?>" href="intake_billing-accounts.php">Add New Bill</a>
+      
+      <a class="sn <?php if ($layout_context === 'intakeFunding') { echo 'active'; } ?>" href="intake_funding-accounts.php">Add New Funding</a>
+
+      <a class="sn legacy <?php if ($layout_context === 'schedule') { echo 'active'; } ?>" href="billing_schedule.php">Legacy: Schedule</a>
       
       
-      <a href="logout.php" class="logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
+      <a href="logout.php" class="sn logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>
 
     </div>
 

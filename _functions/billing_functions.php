@@ -941,3 +941,117 @@ function filter_rows_by_funding_account(array $rows, string $target_account_name
 
   return $filtered;
 }
+
+
+/*  Sunday, June 28, 2026 - 
+    latest update to make billing_schedule.php "the source" - officially moving away from billing_projection.php 
+*/
+
+function funding_account_general_reserve_totals(PDO $pdo_db, int $user_id): array
+{
+  $stmt = $pdo_db->prepare("
+    SELECT
+      fa.account_name,
+      COALESCE(SUM(
+        CASE
+          WHEN fart.transaction_type = 'deduction' THEN -fart.amount
+          ELSE fart.amount
+        END
+      ), 0) AS total_amount
+    FROM funding_accounts fa
+    LEFT JOIN funding_account_reserve_transactions fart
+      ON fa.funding_account_id = fart.funding_account_id
+      AND fart.user_id = fa.user_id
+    WHERE fa.user_id = ?
+      AND fa.is_active = 1
+    GROUP BY fa.funding_account_id, fa.account_name
+    ORDER BY fa.account_name ASC
+  ");
+  $stmt->execute([$user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $totals = [];
+
+  foreach ($rows as $row) {
+    $account_name = trim((string)$row['account_name']);
+    if ($account_name === '') {
+      continue;
+    }
+
+    $totals[$account_name] = round((float)$row['total_amount'], 2);
+  }
+
+  return $totals;
+}
+
+function bill_reserve_totals_by_funding_account(array $rows): array
+{
+  $totals = [];
+
+  foreach ($rows as $row) {
+    $account_name = trim((string)($row['paid_from_account'] ?? ''));
+
+    if ($account_name === '') {
+      $account_name = 'Unassigned';
+    }
+
+    if (!isset($totals[$account_name])) {
+      $totals[$account_name] = 0.00;
+    }
+
+    $totals[$account_name] += (float)($row['reserve_balance'] ?? 0);
+  }
+
+  foreach ($totals as $account_name => $amount) {
+    $totals[$account_name] = round($amount, 2);
+  }
+
+  return $totals;
+}
+
+function combined_reserve_totals_by_funding_account(PDO $pdo_db, int $user_id, array $billing_rows): array
+{
+  $bill_totals = bill_reserve_totals_by_funding_account($billing_rows);
+  $general_totals = funding_account_general_reserve_totals($pdo_db, $user_id);
+
+  $combined = [];
+
+  foreach ($general_totals as $account_name => $amount) {
+    $combined[$account_name] = $amount;
+  }
+
+  foreach ($bill_totals as $account_name => $amount) {
+    if (!isset($combined[$account_name])) {
+      $combined[$account_name] = 0.00;
+    }
+
+    $combined[$account_name] += $amount;
+  }
+
+  foreach ($combined as $account_name => $amount) {
+    $combined[$account_name] = round($amount, 2);
+  }
+
+  ksort($combined, SORT_NATURAL | SORT_FLAG_CASE);
+
+  return $combined;
+}
+
+function combined_reserve_total_for_funding_account(PDO $pdo_db, int $user_id, array $billing_rows, string $target_account_name): float
+{
+  $totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
+  return isset($totals[$target_account_name]) ? round((float)$totals[$target_account_name], 2) : 0.00;
+}
+
+function funding_account_selector_options(PDO $pdo_db, int $user_id): array
+{
+  $stmt = $pdo_db->prepare("
+    SELECT funding_account_id, account_name
+    FROM funding_accounts
+    WHERE user_id = ?
+      AND is_active = 1
+    ORDER BY account_name ASC
+  ");
+  $stmt->execute([$user_id]);
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}

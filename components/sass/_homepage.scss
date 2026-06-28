@@ -1,6 +1,22 @@
 body {
+  &.auth {
+    background-color: #fff;
+  }
   &.lbbc {
     background-color: #265084;
+  }
+  &.loc {
+    background-color: #e84242;
+  }
+}
+a {
+  color: #0000ee;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+  &:visited {
+    color: #0000ee;
   }
 }
 
@@ -87,4 +103,35 @@ body {
   &:hover {
     text-decoration: underline;
   }
+}
+
+table.full-width {
+  width: 100%;
+  tr:nth-child(even) {
+    background-color: rgba(0,0,0,0.1);
+  }
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  margin-bottom: 0.5em;
+  label {
+    width: 200px;
+    // text-align: right;
+    padding-right: 0.5em;
+  }
+}
+.ded-red {
+  color: red;
+}
+
+.static-field {
+  // padding-left: .75em;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.fpdue {
+  font-weight: bold;
 }

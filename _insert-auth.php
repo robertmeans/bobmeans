@@ -1,5 +1,7 @@
 <?php 
 require_once 'config/initialize.php'; 
+$layout_context = 'auth'; /* this is what keeps bkg-color #fff on login */
+
 require '_includes/header.php'; 
 ?>
 <div class="logincon">

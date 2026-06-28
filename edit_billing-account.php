@@ -211,7 +211,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       $user_id
     ]);
 
-    header('Location: billing_schedule.php');
+    header('Location: billing_projection.php');
     exit();
   }
 }

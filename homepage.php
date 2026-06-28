@@ -124,7 +124,13 @@ function homepage_amount_needed(array $row): float
 
 
 
-function homepage_account_projection_summary(array $rows_for_account): array
+
+
+
+
+
+
+function homepage_account_projection_summary(array $rows_for_account, float $pool_amount): array
 {
   if (!$rows_for_account) {
     return [
@@ -132,12 +138,6 @@ function homepage_account_projection_summary(array $rows_for_account): array
       'message' => 'No active bills assigned.',
       'due_date' => null
     ];
-  }
-
-  $pool_amount = 0.00;
-
-  foreach ($rows_for_account as $row) {
-    $pool_amount += (float)($row['reserve_balance'] ?? 0);
   }
 
   $pool_amount = round($pool_amount, 2);
@@ -190,7 +190,8 @@ function homepage_account_projection_summary(array $rows_for_account): array
 
 
 
-$reserve_totals = homepage_reserve_totals($billing_rows, $funding_accounts);
+
+$reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
 
 /*
   map billing rows by funding account
@@ -217,13 +218,14 @@ $total_underfunded = 0.00;
 $attention_rows = [];
 
 foreach ($rows_by_account as $account_name => $rows_for_account) {
-  $projection_summary = homepage_account_projection_summary($rows_for_account);
+  $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+
+  $projection_summary = homepage_account_projection_summary($rows_for_account, $pool_amount);
   $account_attention[$account_name] = $projection_summary;
 
   $events = generate_projected_bill_events($rows_for_account, 12);
-  $projection = apply_pool_to_projected_events($events, array_sum(array_map(function ($row) {
-    return (float)($row['reserve_balance'] ?? 0);
-  }, $rows_for_account)));
+  $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+  $projection = apply_pool_to_projected_events($events, $pool_amount);
 
   foreach ($projection['events'] as $event) {
     if ($event['status'] === 'partial' || $event['status'] === 'due') {
@@ -273,9 +275,8 @@ $exceptions = [];
 
 foreach ($rows_by_account as $account_name => $rows_for_account) {
   $events = generate_projected_bill_events($rows_for_account, 12);
-  $projection = apply_pool_to_projected_events($events, array_sum(array_map(function ($row) {
-    return (float)($row['reserve_balance'] ?? 0);
-  }, $rows_for_account)));
+  $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+  $projection = apply_pool_to_projected_events($events, $pool_amount);
 
   foreach ($projection['events'] as $event) {
     if ($event['status'] === 'partial' || $event['status'] === 'due') {
@@ -295,6 +296,26 @@ usort($exceptions, function ($a, $b) {
 });
 
 $exceptions = array_slice($exceptions, 0, 10);
+
+
+/* funding account / reserve activity */
+$stmt = $pdo_db->prepare("
+  SELECT
+    fart.funding_account_reserve_transaction_id,
+    fart.transaction_type,
+    fart.amount,
+    fart.transaction_date,
+    fart.note,
+    fa.account_name
+  FROM funding_account_reserve_transactions fart
+  LEFT JOIN funding_accounts fa
+    ON fart.funding_account_id = fa.funding_account_id
+  WHERE fart.user_id = ?
+  ORDER BY fart.transaction_date DESC, fart.funding_account_reserve_transaction_id DESC
+  LIMIT 5
+");
+$stmt->execute([$user_id]);
+$recent_account_adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
   recent reserve activity
@@ -362,7 +383,7 @@ require '_includes/nav.php';
           <p>No funding accounts found.</p>
         <?php endif; ?>
       </div>
-
+      
       <div class="dashboard-card">
         <h2>Next Round Total</h2>
         <div class="dashboard-big">
@@ -372,13 +393,13 @@ require '_includes/nav.php';
 
       <div class="dashboard-card">
         <h2>Next Up Per Account</h2>
+        <p>Today's date: <strong><?php echo date('m.d.y'); ?></strong></p>
         <?php if ($account_attention_list): ?>
           <?php foreach ($account_attention_list as $item): ?>
             <?php
             $account_name = $item['account_name'];
             $summary = $item['summary'];
             ?>
-
 
           <div class="dashboard-line <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
             <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong>
@@ -392,7 +413,6 @@ require '_includes/nav.php';
             </a>
           </div>
 
-
           <?php endforeach; ?>
         <?php else: ?>
           <p>No active billing accounts found.</p>
@@ -401,12 +421,15 @@ require '_includes/nav.php';
 
       <div class="dashboard-card">
         <h2>Quick Links</h2>
+        <!-- <div class="dashboard-line"><a href="billing_schedule.php">Billing Schedule</a></div> -->
         <div class="dashboard-line"><a href="billing_projection.php">Billing Projection</a></div>
-        <div class="dashboard-line"><a href="billing_schedule.php">Billing Schedule</a></div>
+        <div class="dashboard-line"><a href="reserve_adjustment.php">Reserve Adjustment</a></div>
+        <?php /*
         <div class="dashboard-line"><a href="billing_accounts.php">Billing Accounts</a></div>
         <div class="dashboard-line"><a href="funding_accounts.php">Funding Accounts</a></div>
         <div class="dashboard-line"><a href="intake_billing-accounts.php">Add Billing Account</a></div>
         <div class="dashboard-line"><a href="intake_funding-accounts.php">Add Funding Account</a></div>
+        */ ?>
       </div>
 
     </div>
@@ -417,7 +440,7 @@ require '_includes/nav.php';
         <h2>Next 10</h2>
 
         <?php if ($exceptions): ?>
-          <table>
+          <table class="full-width">
             <thead>
               <tr>
                 <th>Bill</th>
@@ -448,11 +471,19 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
+
+
+
+
+
+
+
+
       <div class="dashboard-card wide-card">
-        <h2>Recent Reserve Activity</h2>
+        <h2>Recent Bill Activity</h2>
 
         <?php if ($recent_reserve_activity): ?>
-          <table>
+          <table class="full-width">
             <thead>
               <tr>
                 <th>When</th>
@@ -474,7 +505,14 @@ require '_includes/nav.php';
                   </td>
                   <td><?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                   <td><?php echo htmlspecialchars((string)$row['transaction_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td>$<?php echo number_format((float)$row['amount'], 2); ?></td>
+                  
+                  <td <?php if ((string)$row['transaction_type'] === 'deduction') { echo 'class="ded-red"'; } ?>>
+                    <?php
+                    $sign = ((string)$row['transaction_type'] === 'deduction') ? '-' : '+';
+                    echo $sign . '$' . number_format((float)$row['amount'], 2);
+                    ?>
+                  </td>
+
                   <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
                 </tr>
               <?php endforeach; ?>
@@ -485,11 +523,55 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
+
+      <div class="dashboard-card wide-card">
+        <h2>Recent Account Adjustments</h2>
+
+        <?php if ($recent_account_adjustments): ?>
+          <table class="full-width">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Account</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($recent_account_adjustments as $row): ?>
+                <tr>
+                  <td>
+                    <?php
+                    echo !empty($row['transaction_date'])
+                      ? date("m.d.y \\a\\t H:i", strtotime($row['transaction_date']))
+                      : '';
+                    ?>
+                  </td>
+                  <td><?php echo htmlspecialchars((string)$row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td><?php echo htmlspecialchars((string)$row['transaction_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td <?php if ((string)$row['transaction_type'] === 'deduction') { echo 'class="ded-red"'; } ?>>
+                    <?php
+                    $sign = ((string)$row['transaction_type'] === 'deduction') ? '-' : '+';
+                    echo $sign . '$' . number_format((float)$row['amount'], 2);
+                    ?>
+                  </td>
+                  <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php else: ?>
+          <p>No reserve adjustments recorded yet.</p>
+        <?php endif; ?>
+      </div>
+
+      <?php /* 
       <div class="dashboard-card wide-card">
         <h2>Recent Payments</h2>
 
         <?php if ($recent_payments): ?>
-          <table>
+          <table class="full-width">
             <thead>
               <tr>
                 <th>When</th>
@@ -521,6 +603,7 @@ require '_includes/nav.php';
           <p>No payments recorded yet.</p>
         <?php endif; ?>
       </div>
+      <?php */ ?>
 
     </div>
 

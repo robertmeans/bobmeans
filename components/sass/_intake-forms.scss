@@ -63,6 +63,12 @@ form {
   flex-direction: column;
   align-items: center;
 }
+form.pro-acct {
+  flex-direction: row;
+  label {
+    margin-right: .75em;
+  }
+}
 input,
 select {
   font-size: 1em;
@@ -227,3 +233,17 @@ table {
 .paypal-icon {
   max-width: 16px;
 }
+.table-container {
+  max-height: 65vh;
+  overflow-y: scroll;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    thead th {
+      position: sticky;
+      background-color: #000;
+      top: 0;
+      z-index: 22;
+    }
+  }
+} 

@@ -38,7 +38,7 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$reserve_totals = reserve_totals_by_funding_account($rows);
+$reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $rows);
 
 if (!isset($reserve_totals[$selected_account])) {
   $account_names = array_keys($reserve_totals);
@@ -46,7 +46,7 @@ if (!isset($reserve_totals[$selected_account])) {
 }
 
 $projection_rows = filter_rows_by_funding_account($rows, $selected_account);
-$pool_amount = reserve_total_for_funding_account($rows, $selected_account);
+$pool_amount = combined_reserve_total_for_funding_account($pdo_db, $user_id, $rows, $selected_account);
 
 $months_ahead = 12;
 $events = generate_projected_bill_events($projection_rows, $months_ahead);
@@ -61,19 +61,27 @@ require '_includes/nav.php';
 
     <?php /* <h1>Billing Projection</h1> */ ?>
 
-    <form method="get" style="margin-bottom: 1em;">
-      <label for="account"><strong>Projection Account:</strong></label>
-      <select id="account" name="account" onchange="this.form.submit()">
-        <?php foreach ($reserve_totals as $account_name => $amount): ?>
-          <option value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>" <?php echo ($selected_account === $account_name) ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-      <noscript><button type="submit">View</button></noscript>
-    </form>
 
+    <?php 
+    if (count($reserve_totals) === 1) { 
+      $skip = 'yes'; 
+    } else { 
+      $skip = 'no'; 
+    } ?>
 
+    <?php if ($skip !== 'yes') { ?>
+      <form class="pro-acct" method="get" style="margin-bottom: 1em;">
+        <label for="account"><strong>Projection Account:</strong></label>
+        <select id="account" name="account" onchange="this.form.submit()">
+          <?php foreach ($reserve_totals as $account_name => $amount): ?>
+            <option value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>" <?php echo ($selected_account === $account_name) ? 'selected' : ''; ?>>
+              <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+        <noscript><button type="submit">View</button></noscript>
+      </form>
+    <?php } ?>
 
       <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
         <div class="success" style="display:block;">
@@ -85,35 +93,27 @@ require '_includes/nav.php';
       <?php endif; ?>
 
 
-
-<?php /*
-    <div class="paypal-running-balance inner-links top">
-      <a href="billing_schedule.php">Schedule</a> | 
-      <strong style="margin-left:1em;">Pooled PayPal Reserve:</strong>
-      &nbsp;&nbsp;$<?php echo number_format($projection['starting_pool'], 2); ?>
-    </div>
-*/ ?>
-
-
       <div class="paypal-running-balance">
+        <?php if ($skip !== 'yes') { ?>
         <?php foreach ($reserve_totals as $account_name => $amount): ?>
           <div>
             <strong>
               <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
-              <?php echo ($selected_account === $account_name) ? ' (selected)' : ''; ?>:
+              <?php if ($skip !== 'yes') { echo ($selected_account === $account_name) ? ' (selected)' : ''; } ?>:
             </strong>
             $<?php echo number_format($amount, 2); ?>
           </div>
         <?php endforeach; ?>
+        <?php } ?>
 
-        <div style="margin-top: 0.5em;">
-          <strong>Pooled Reserve Used In Projection:</strong>
+        <div style="margin: 0.5em 0 0.5em;">
+          <strong><?php echo htmlspecialchars($selected_account, ENT_QUOTES, 'UTF-8'); ?> Reserve Used In Projection:</strong>
           $<?php echo number_format($projection['starting_pool'], 2); ?>
         </div>
       </div>
 
 
-
+    <div class="table-container">
     <table>
       <thead>
         <tr>
@@ -172,7 +172,7 @@ require '_includes/nav.php';
         <?php endif; ?>
           </td>
 
-          <td><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>
+          <td <?php if ($event['status'] === 'partial') { echo 'class="fpdue"'; } ?>><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>
 
           <td>$<?php echo number_format((float)$event['amount'], 2); ?></td>
 
@@ -190,7 +190,7 @@ require '_includes/nav.php';
 
           <td>$<?php echo number_format((float)$event['covered_by_pool'], 2); ?></td>
 
-          <td>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
+          <td <?php if ($event['status'] === 'partial') { echo 'class="fpdue"'; } ?>>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
 
           <td>$<?php echo number_format((float)$event['pool_remaining_after'], 2); ?></td>
         </tr>
@@ -198,11 +198,11 @@ require '_includes/nav.php';
 
       </tbody>
     </table>
+    </div>
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Schedule</a> |
-      <a href="intake_funding-accounts.php">New Funding</a> |
-      <a href="intake_billing-accounts.php">New Bill</a>
+      <a href="index.php">Dashboard</a> |
+      <a href="reserve_adjustment.php">Reserve Adjustment</a>
     </div>
 
   </div>

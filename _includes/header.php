@@ -47,5 +47,18 @@
   <?php } ?>
 
 </head>
-<body <?php if (isset($_SESSION['loggedin'])) { ?>class="lbbc"<?php } ?>>
+<?php if (false): ?>
+      <body <?php if (isset($_SESSION['loggedin'])) { ?>class="lbbc"<?php } ?>>
+<?php endif; ?>
+
+<body class="<?php 
+  if (isset($layout_context) && $layout_context === 'auth') { 
+    ?>auth<?php 
+  } else  { 
+    if (WWW === 'dev') { 
+      ?>loc<?php 
+    } else { 
+      ?>lbbc<?php 
+    } 
+  } ?>">
   <div class="main-wrap"><?php /* .main-wrap open */ ?>
