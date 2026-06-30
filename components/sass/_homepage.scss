@@ -37,7 +37,9 @@ a {
     }
   }
 }
-
+.dashboard-line.green {
+  color: green;
+}
 
 .dashboard {
   display: flex;
@@ -50,7 +52,7 @@ a {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1em;
   margin-bottom: 1.5em;
 }

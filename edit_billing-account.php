@@ -383,8 +383,8 @@ require '_includes/nav.php';
     <?php endif; ?>
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Billing Schedule</a> |
-      <a href="billing_projection.php">Billing Projection</a>
+      <a href="index.php">Dashboard</a> |
+      <a href="reserve_adjustment.php">Reserve Adjustment</a>
     </div>
 
   </div>

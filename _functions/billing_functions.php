@@ -1055,3 +1055,71 @@ function funding_account_selector_options(PDO $pdo_db, int $user_id): array
   $stmt->execute([$user_id]);
   return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+function dashboard_monthly_due_totals(array $rows, int $months_ahead = 6): array
+{
+  $totals = [];
+  $today = new DateTime('first day of this month');
+  $today->setTime(0, 0, 0);
+
+  for ($i = 0; $i < $months_ahead; $i++) {
+    $month = clone $today;
+    $month->modify('+' . $i . ' months');
+    $key = $month->format('Y-m');
+    $totals[$key] = 0.00;
+  }
+
+  $events = generate_projected_bill_events($rows, $months_ahead);
+
+  foreach ($events as $event) {
+    if (empty($event['due_date'])) {
+      continue;
+    }
+
+    $month_key = date('Y-m', strtotime($event['due_date']));
+
+    if (isset($totals[$month_key])) {
+      $totals[$month_key] += (float)$event['amount'];
+    }
+  }
+
+  foreach ($totals as $key => $amount) {
+    $totals[$key] = round($amount, 2);
+  }
+
+  return $totals;
+}
+
+/* 0629260931 - number 3 below, '$months_ahead = x' */
+function dashboard_monthly_needed_totals(array $rows, float $pool_amount, int $months_ahead = 4): array
+{
+  $totals = [];
+  $today = new DateTime('first day of this month');
+  $today->setTime(0, 0, 0);
+
+  for ($i = 0; $i < $months_ahead; $i++) {
+    $month = clone $today;
+    $month->modify('+' . $i . ' months');
+    $key = $month->format('Y-m');
+    $totals[$key] = 0.00;
+  }
+
+  $events = generate_projected_bill_events($rows, $months_ahead);
+  $projection = apply_pool_to_projected_events($events, $pool_amount);
+
+  foreach ($projection['events'] as $event) {
+    if (($event['status'] === 'partial' || $event['status'] === 'due') && !empty($event['due_date'])) {
+      $month_key = date('Y-m', strtotime($event['due_date']));
+
+      if (isset($totals[$month_key])) {
+        $totals[$month_key] += (float)$event['remaining_due'];
+      }
+    }
+  }
+
+  foreach ($totals as $key => $amount) {
+    $totals[$key] = round($amount, 2);
+  }
+
+  return $totals;
+}

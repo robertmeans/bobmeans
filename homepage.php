@@ -43,6 +43,9 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $billing_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+/* get monthly totals */
+$monthly_due_totals = dashboard_monthly_due_totals($billing_rows, 6);
+
 /*
   load funding accounts so we can show zero-balance accounts too
 */
@@ -114,22 +117,6 @@ function homepage_amount_needed(array $row): float
   return round($remaining, 2);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function homepage_account_projection_summary(array $rows_for_account, float $pool_amount): array
 {
   if (!$rows_for_account) {
@@ -180,17 +167,6 @@ function homepage_account_projection_summary(array $rows_for_account, float $poo
   ];
 }
 
-
-
-
-
-
-
-
-
-
-
-
 $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
 
 /*
@@ -209,6 +185,41 @@ foreach ($billing_rows as $row) {
 
   $rows_by_account[$account_name][] = $row;
 }
+
+
+/* 
+  left, unpaid, per month
+*/
+$monthly_needed_totals = [];
+$today = new DateTime('first day of this month');
+$today->setTime(0, 0, 0);
+
+/* to change the # of months shown, change 3 values. below is #1 (now search: 0629260931 for #2) */
+for ($i = 0; $i < 4; $i++) {
+  $month = clone $today;
+  $month->modify('+' . $i . ' months');
+  $key = $month->format('Y-m');
+  $monthly_needed_totals[$key] = 0.00;
+}
+
+foreach ($rows_by_account as $account_name => $rows_for_account) {
+  $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+  /* 0629260931 - #2 at end of line below. search same string in billing_functions.php for #3. */
+  $account_monthly_needed = dashboard_monthly_needed_totals($rows_for_account, $pool_amount, 4);
+
+  foreach ($account_monthly_needed as $month_key => $amount) {
+    if (!isset($monthly_needed_totals[$month_key])) {
+      $monthly_needed_totals[$month_key] = 0.00;
+    }
+
+    $monthly_needed_totals[$month_key] += $amount;
+  }
+}
+
+foreach ($monthly_needed_totals as $month_key => $amount) {
+  $monthly_needed_totals[$month_key] = round($amount, 2);
+}
+
 
 /*
   next up per funding account
@@ -366,10 +377,16 @@ require '_includes/nav.php';
 <div class="dashboard">
   <div class="billing-schedule">
 
-    <h1 style="color:#fff;">Dashboard</h1>
+    <!-- <h1 style="color:#fff;">Dashboard</h1> -->
+
+    <div class="inner-links">
+      <a href="billing_projection.php">Projection</a> |
+      <a href="reserve_adjustment.php">Reserve Adjustment</a>
+    </div>
 
     <div class="dashboard-grid">
 
+<?php /*
       <div class="dashboard-card">
         <h2>Reserve Totals</h2>
         <?php if ($reserve_totals): ?>
@@ -383,7 +400,9 @@ require '_includes/nav.php';
           <p>No funding accounts found.</p>
         <?php endif; ?>
       </div>
-      
+*/ ?>
+
+     
       <div class="dashboard-card">
         <h2>Next Round Total</h2>
         <div class="dashboard-big">
@@ -419,18 +438,64 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
+
+<?php /* this is total remaining per month - it does not account for what is already covered, just what is left to pay -
+
+      <div class="dashboard-card">
+        <h2>Due by Month</h2>
+
+        <?php if ($monthly_due_totals): ?>
+          <?php foreach ($monthly_due_totals as $month_key => $amount): ?>
+            <div class="dashboard-line">
+              <strong><?php echo date('M Y', strtotime($month_key . '-01')); ?>:</strong>
+              $<?php echo number_format($amount, 2); ?>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p>No projected bills found.</p>
+        <?php endif; ?>
+      </div>
+*/ ?>
+
+<?php /*  this is what remains unpaid per month. 
+          if you want to change # of months shown, search: 0629260931 */ ?>
+      <div class="dashboard-card">
+        <h2>Still Needed by Month</h2>
+
+        <?php if ($monthly_needed_totals): ?>
+          <?php foreach ($monthly_needed_totals as $month_key => $amount): ?>
+            <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
+              <strong><?php echo date('M Y', strtotime($month_key . '-01')); ?>:</strong>
+              $<?php echo number_format($amount, 2); ?>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p>No projected shortfalls found.</p>
+        <?php endif; ?>
+      </div>
+
+
+<?php /*
       <div class="dashboard-card">
         <h2>Quick Links</h2>
         <!-- <div class="dashboard-line"><a href="billing_schedule.php">Billing Schedule</a></div> -->
         <div class="dashboard-line"><a href="billing_projection.php">Billing Projection</a></div>
         <div class="dashboard-line"><a href="reserve_adjustment.php">Reserve Adjustment</a></div>
-        <?php /*
+
+
+
         <div class="dashboard-line"><a href="billing_accounts.php">Billing Accounts</a></div>
         <div class="dashboard-line"><a href="funding_accounts.php">Funding Accounts</a></div>
         <div class="dashboard-line"><a href="intake_billing-accounts.php">Add Billing Account</a></div>
         <div class="dashboard-line"><a href="intake_funding-accounts.php">Add Funding Account</a></div>
-        */ ?>
+
+
       </div>
+*/ ?>
+
+
+
+
 
     </div>
 
@@ -470,14 +535,6 @@ require '_includes/nav.php';
           <p>Nothing currently partial or due in the next projection window.</p>
         <?php endif; ?>
       </div>
-
-
-
-
-
-
-
-
 
       <div class="dashboard-card wide-card">
         <h2>Recent Bill Activity</h2>

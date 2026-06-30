@@ -19,6 +19,7 @@
   color: #fff;
 }
 .inner-links {
+  color: #fff;
   display: flex;
   align-items: center;
   margin-top: 1em;
@@ -36,6 +37,12 @@
     a {
       margin: 0 1em 0;
     }
+  }
+}
+.billing-schedule .inner-links {
+  margin-top: 0;
+  & > a {
+    margin-top: .75em;
   }
 }
 .two-col {
