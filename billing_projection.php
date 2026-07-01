@@ -20,7 +20,7 @@ $stmt = $pdo_db->prepare("
     ba.cadence,
     ba.reserve_style,
     ba.default_amount,
-    ba.reserve_balance,
+    -- ba.reserve_balance,
     ba.next_due_date,
     ba.actual_due_date,
     ba.renewal_term_months,
@@ -38,7 +38,8 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $rows);
+// $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $rows);
+$reserve_totals = funding_account_pool_totals($pdo_db, $user_id);
 
 if (!isset($reserve_totals[$selected_account])) {
   $account_names = array_keys($reserve_totals);
@@ -46,7 +47,8 @@ if (!isset($reserve_totals[$selected_account])) {
 }
 
 $projection_rows = filter_rows_by_funding_account($rows, $selected_account);
-$pool_amount = combined_reserve_total_for_funding_account($pdo_db, $user_id, $rows, $selected_account);
+// $pool_amount = combined_reserve_total_for_funding_account($pdo_db, $user_id, $rows, $selected_account);
+$pool_amount = isset($reserve_totals[$selected_account]) ? (float)$reserve_totals[$selected_account] : 0.00;
 
 $months_ahead = 12;
 $events = generate_projected_bill_events($projection_rows, $months_ahead);
@@ -83,6 +85,8 @@ require '_includes/nav.php';
       </form>
     <?php } ?>
 
+
+<?php /*
       <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
         <div class="success" style="display:block;">
           Processed: <?php echo (int)$reconciliation['processed_count']; ?>
@@ -91,6 +95,9 @@ require '_includes/nav.php';
           <?php endif; ?>
         </div>
       <?php endif; ?>
+*/ ?>
+
+
 
       <div class="paypal-running-balance">
         <?php if ($skip !== 'yes') { ?>

@@ -39,47 +39,29 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
     $errors[] = 'Contribution amount must be greater than 0.';
   }
 
+  $funding_account_id = isset($billing_account['default_funding_account_id'])
+    ? (int)$billing_account['default_funding_account_id']
+    : 0;
+
+  if ($funding_account_id < 1) {
+    $errors[] = 'This bill does not have a funding account assigned.';
+  }
+
   if (!$errors) {
-    $current_reserve_balance = (float)$billing_account['reserve_balance'];
-    $contribution = (float)$contribution_amount;
-    $new_reserve_balance = round($current_reserve_balance + $contribution, 2);
+    $contribution = round((float)$contribution_amount, 2);
 
-    $covered_cycles_before = covered_cycles_from_reserve($billing_account, $current_reserve_balance);
-    $covered_cycles_after = covered_cycles_from_reserve($billing_account, $new_reserve_balance);
+    $note_parts = [];
+    $note_parts[] = 'Contribution made from bill page for ' . $billing_account['billing_name'] . '.';
 
-    $newly_covered_cycles = $covered_cycles_after - $covered_cycles_before;
-
-    $new_next_due_date = $billing_account['next_due_date'];
-
-    if ($newly_covered_cycles > 0) {
-      $new_next_due_date = advance_next_due_date_by_cycles(
-        $billing_account,
-        $billing_account['next_due_date'],
-        $newly_covered_cycles
-      );
+    if ($contribution_note !== '') {
+      $note_parts[] = $contribution_note;
     }
 
-    $stmt = $pdo_db->prepare("
-      UPDATE billing_accounts
-      SET
-        reserve_balance = ?,
-        next_due_date = ?,
-        updated_at = NOW()
-      WHERE billing_account_id = ?
-        AND user_id = ?
-      LIMIT 1
-    ");
-
-    $stmt->execute([
-      $new_reserve_balance,
-      $new_next_due_date,
-      $billing_account['billing_account_id'],
-      $user_id
-    ]);
+    $full_note = implode(' ', $note_parts);
 
     $stmt = $pdo_db->prepare("
-      INSERT INTO bill_reserve_transactions (
-        billing_account_id,
+      INSERT INTO funding_account_reserve_transactions (
+        funding_account_id,
         user_id,
         transaction_type,
         amount,
@@ -89,15 +71,15 @@ if (is_post_request() && isset($_POST['submit_reserve_contribution']) && $billin
     ");
 
     $stmt->execute([
-      $billing_account['billing_account_id'],
+      $funding_account_id,
       $user_id,
       'contribution',
       $contribution,
       date('Y-m-d H:i:s'),
-      $contribution_note !== '' ? $contribution_note : null
+      $full_note
     ]);
 
-    redirect_to('billing_schedule.php');
+    redirect_to('bill_details.php?billing_account_id=' . (int)$billing_account['billing_account_id']);
   }
 }
 

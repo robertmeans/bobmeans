@@ -393,9 +393,6 @@ function add_months_to_date(string $date_string, int $months): string
   return $date->format('Y-m-d');
 }
 
-
-
-
 function months_to_advance_for_bill(array $bill, int $cycles = 1): int
 {
   $renewal_term_months = isset($bill['renewal_term_months'])
@@ -408,10 +405,6 @@ function months_to_advance_for_bill(array $bill, int $cycles = 1): int
 
   return $renewal_term_months * $cycles;
 }
-
-
-
-
 
 function projected_actual_due_date(array $bill): string
 {
@@ -433,14 +426,10 @@ function projected_actual_due_date(array $bill): string
   return add_months_to_date($next_due_date, -$months_back);
 }
 
-
 function base_amount_for_bill(array $bill): float
 {
   return round((float)($bill['default_amount'] ?? 0), 2);
 }
-
-
-
 
 function pooled_paypal_balance(array $rows): float
 {
@@ -456,11 +445,6 @@ function pooled_paypal_balance(array $rows): float
 
   return round($total, 2);
 }
-
-
-
-
-
 
 function safe_day_for_month(int $year, int $month, int $day): int
 {
@@ -532,9 +516,6 @@ function next_annual_occurrence_from_anchor(int $due_month_of_year, int $due_day
   return $candidate;
 }
 
-
-
-
 function first_projected_due_date(array $bill, DateTime $today): ?DateTime
 {
   $actual_due_date = trim((string)($bill['actual_due_date'] ?? ''));
@@ -551,17 +532,6 @@ function first_projected_due_date(array $bill, DateTime $today): ?DateTime
     return null;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 function generate_projected_bill_events(array $rows, int $months_ahead = 12): array
 {
@@ -612,16 +582,6 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
 
   return $events;
 }
-
-
-
-
-
-
-
-
-
-
 
 function apply_pool_to_projected_events(array $events, float $pool_amount): array
 {
@@ -737,12 +697,12 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
       $bill['default_funding_account_id'] !== null ? (int)$bill['default_funding_account_id'] : null,
       $bill['transfer_from_funding_account_id'] !== null ? (int)$bill['transfer_from_funding_account_id'] : null,
       'paid',
-      'Auto-deducted from reserve'
+      'Auto-deducted from funding account pool'
     ]);
 
     $stmt = $pdo_db->prepare("
-      INSERT INTO bill_reserve_transactions (
-        billing_account_id,
+      INSERT INTO funding_account_reserve_transactions (
+        funding_account_id,
         user_id,
         transaction_type,
         amount,
@@ -751,33 +711,17 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
       ) VALUES (?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
-      $billing_account_id,
+      (int)$bill['default_funding_account_id'],
       $user_id,
       'deduction',
       $amount,
       $due_date . ' 00:00:00',
-      'Automatic draft deduction'
-    ]);
-
-    $stmt = $pdo_db->prepare("
-      UPDATE billing_accounts
-      SET
-        reserve_balance = ?,
-        actual_due_date = ?,
-        updated_at = NOW()
-      WHERE billing_account_id = ?
-        AND user_id = ?
-      LIMIT 1
-    ");
-    $stmt->execute([
-      $new_reserve_balance,
-      $next_actual_due->format('Y-m-d'),
-      $billing_account_id,
-      $user_id
+      'Automatic draft deduction for ' . $bill['billing_name']
     ]);
 
     $pdo_db->commit();
     return true;
+
   } catch (Exception $e) {
     if ($pdo_db->inTransaction()) {
       $pdo_db->rollBack();
@@ -787,22 +731,6 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
     return false;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
 {
@@ -877,10 +805,6 @@ function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
     'skipped_count' => $skipped_count
   ];
 }
-
-
-
-
 
 function reserve_totals_by_funding_account(array $rows): array
 {
@@ -1224,4 +1148,311 @@ function days_until_next_uncovered_bill_date(array $rows_by_account, array $rese
     'status' => $next_event['status'],
     'remaining_due' => (float)$next_event['remaining_due']
   ];
+}
+
+function projection_summary_for_account(
+  string $account_name,
+  array $rows_for_account,
+  float $pool_amount,
+  int $months_ahead = 12
+): array {
+  $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
+  $events = generate_projected_bill_events($rows_for_account, $months_ahead);
+  $projection = apply_pool_to_projected_events($events, $pool_amount);
+
+  $next_uncovered_event = null;
+  $monthly_needed_totals = [];
+
+  $month_cursor = new DateTime('first day of this month');
+  $month_cursor->setTime(0, 0, 0);
+
+  for ($i = 0; $i < $months_ahead; $i++) {
+    $key = $month_cursor->format('Y-m');
+    $monthly_needed_totals[$key] = 0.00;
+    $month_cursor->modify('+1 month');
+  }
+
+  foreach ($projection['events'] as $event) {
+    if (
+      ($event['status'] === 'partial' || $event['status'] === 'due') &&
+      !empty($event['due_date'])
+    ) {
+      if ($next_uncovered_event === null) {
+        $next_uncovered_event = $event;
+      }
+
+      $month_key = date('Y-m', strtotime($event['due_date']));
+      if (isset($monthly_needed_totals[$month_key])) {
+        $monthly_needed_totals[$month_key] += (float)$event['remaining_due'];
+      }
+    }
+  }
+
+  foreach ($monthly_needed_totals as $month_key => $amount) {
+    $monthly_needed_totals[$month_key] = round($amount, 2);
+  }
+
+  $next_uncovered_days = null;
+  $first_problem_summary = [
+    'status' => 'empty',
+    'message' => 'No active bills assigned.',
+    'due_date' => null
+  ];
+
+  if (!empty($projection['events'])) {
+    $first_problem_summary = [
+      'status' => 'covered',
+      'message' => 'Covered through ' . date('m.d.y', strtotime(end($projection['events'])['due_date'])),
+      'due_date' => end($projection['events'])['due_date']
+    ];
+  }
+
+  if ($next_uncovered_event !== null) {
+    $next_date = new DateTime($next_uncovered_event['due_date']);
+    $next_date->setTime(0, 0, 0);
+    $next_uncovered_days = (int)$today->diff($next_date)->format('%r%a');
+
+    $first_problem_summary = [
+      'status' => $next_uncovered_event['status'],
+      // 'message' => date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_event['due_date'])) . ' <span style="font-size:0.8em;display:inline-block;position:relative;top:-3px;margin:0 5px;">●</span> ' . $next_uncovered_event['billing_name'],
+      'message' => date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_event['due_date'])) . ' <span style="font-size:0.8em;display:inline-block;position:relative;top:-3px;margin:0 5px;">●</span> ',
+      'remaining_due' => (float)$next_uncovered_event['remaining_due'],
+      'due_date' => $next_uncovered_event['due_date']
+    ];
+  }
+
+  return [
+    'account_name' => $account_name,
+    'pool_amount' => round($pool_amount, 2),
+    'events' => $events,
+    'projection' => $projection,
+    'next_uncovered_event' => $next_uncovered_event,
+    'next_uncovered_days' => $next_uncovered_days,
+    'monthly_needed_totals' => $monthly_needed_totals,
+    'first_problem_summary' => $first_problem_summary
+  ];
+}
+
+function projection_summary_for_all_accounts(
+  array $rows_by_account,
+  array $reserve_totals,
+  int $months_ahead = 12
+): array {
+  $account_summaries = [];
+  $combined_monthly_needed_totals = [];
+  $exceptions = [];
+  $next_uncovered_candidates = [];
+  $total_underfunded = 0.00;
+
+  $month_cursor = new DateTime('first day of this month');
+  $month_cursor->setTime(0, 0, 0);
+
+  for ($i = 0; $i < $months_ahead; $i++) {
+    $key = $month_cursor->format('Y-m');
+    $combined_monthly_needed_totals[$key] = 0.00;
+    $month_cursor->modify('+1 month');
+  }
+
+  foreach ($rows_by_account as $account_name => $rows_for_account) {
+    $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+
+    $summary = projection_summary_for_account(
+      $account_name,
+      $rows_for_account,
+      $pool_amount,
+      $months_ahead
+    );
+
+    $account_summaries[$account_name] = $summary;
+
+    if ($summary['next_uncovered_event'] !== null) {
+      $next_uncovered_candidates[] = array_merge(
+        $summary['next_uncovered_event'],
+        ['funding_account' => $account_name]
+      );
+    }
+
+    foreach ($summary['projection']['events'] as $event) {
+      if ($event['status'] === 'partial' || $event['status'] === 'due') {
+        $exceptions[] = array_merge($event, [
+          'funding_account' => $account_name
+        ]);
+        $total_underfunded += (float)$event['remaining_due'];
+      }
+    }
+
+    foreach ($summary['monthly_needed_totals'] as $month_key => $amount) {
+      if (!isset($combined_monthly_needed_totals[$month_key])) {
+        $combined_monthly_needed_totals[$month_key] = 0.00;
+      }
+
+      $combined_monthly_needed_totals[$month_key] += $amount;
+    }
+  }
+
+  foreach ($combined_monthly_needed_totals as $month_key => $amount) {
+    $combined_monthly_needed_totals[$month_key] = round($amount, 2);
+  }
+
+  usort($exceptions, function ($a, $b) {
+    if ($a['due_date'] === $b['due_date']) {
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+    }
+
+    return strcmp((string)$a['due_date'], (string)$b['due_date']);
+  });
+
+  usort($next_uncovered_candidates, function ($a, $b) {
+    if ($a['due_date'] === $b['due_date']) {
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+    }
+
+    return strcmp((string)$a['due_date'], (string)$b['due_date']);
+  });
+
+  $account_attention_list = [];
+
+  foreach ($account_summaries as $account_name => $summary) {
+    $account_attention_list[] = [
+      'account_name' => $account_name,
+      'summary' => $summary['first_problem_summary']
+    ];
+  }
+
+  usort($account_attention_list, function ($a, $b) {
+    $date_a = $a['summary']['due_date'] ?? null;
+    $date_b = $b['summary']['due_date'] ?? null;
+
+    if ($date_a === $date_b) {
+      return strcmp((string)$a['account_name'], (string)$b['account_name']);
+    }
+
+    if ($date_a === null) {
+      return 1;
+    }
+
+    if ($date_b === null) {
+      return -1;
+    }
+
+    return strcmp($date_a, $date_b);
+  });
+
+  return [
+    'account_summaries' => $account_summaries,
+    'account_attention_list' => $account_attention_list,
+    'next_uncovered_bill' => !empty($next_uncovered_candidates) ? $next_uncovered_candidates[0] : null,
+    'exceptions' => $exceptions,
+    'monthly_needed_totals' => $combined_monthly_needed_totals,
+    'total_underfunded' => round($total_underfunded, 2)
+  ];
+}
+
+function funding_account_ledger_rows(PDO $pdo_db, int $user_id, int $funding_account_id): array
+{
+  $ledger = [];
+
+  /*
+    funding-account reserve transactions are the only real money movements
+  */
+  $stmt = $pdo_db->prepare("
+    SELECT
+      fart.transaction_date AS event_datetime,
+      'account_transaction' AS event_type,
+      fart.transaction_type AS sub_type,
+      NULL AS billing_account_id,
+      NULL AS billing_name,
+      fa.account_name,
+      fart.note AS note,
+      CASE
+        WHEN fart.transaction_type = 'deduction' THEN -fart.amount
+        ELSE fart.amount
+      END AS signed_amount
+    FROM funding_account_reserve_transactions fart
+    INNER JOIN funding_accounts fa
+      ON fart.funding_account_id = fa.funding_account_id
+    WHERE fart.user_id = ?
+      AND fart.funding_account_id = ?
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  foreach ($rows as $row) {
+    $ledger[] = $row;
+  }
+
+  usort($ledger, function ($a, $b) {
+    if ($a['event_datetime'] === $b['event_datetime']) {
+      return strcmp((string)$a['sub_type'], (string)$b['sub_type']);
+    }
+
+    return strcmp((string)$a['event_datetime'], (string)$b['event_datetime']);
+  });
+
+  return $ledger;
+}
+
+function funding_account_ledger_with_running_balance(PDO $pdo_db, int $user_id, int $funding_account_id): array
+{
+  $rows = funding_account_ledger_rows($pdo_db, $user_id, $funding_account_id);
+
+  $running_balance = 0.00;
+
+  foreach ($rows as $index => $row) {
+    $running_balance += (float)$row['signed_amount'];
+    $rows[$index]['running_balance'] = round($running_balance, 2);
+  }
+
+  return $rows;
+}
+
+function funding_account_current_balance_from_ledger(PDO $pdo_db, int $user_id, int $funding_account_id): float
+{
+  $rows = funding_account_ledger_with_running_balance($pdo_db, $user_id, $funding_account_id);
+
+  if (!$rows) {
+    return 0.00;
+  }
+
+  $last = end($rows);
+  return round((float)$last['running_balance'], 2);
+}
+
+function funding_account_pool_totals(PDO $pdo_db, int $user_id): array
+{
+  $stmt = $pdo_db->prepare("
+    SELECT
+      fa.account_name,
+      COALESCE(SUM(
+        CASE
+          WHEN fart.transaction_type = 'deduction' THEN -fart.amount
+          ELSE fart.amount
+        END
+      ), 0) AS total_amount
+    FROM funding_accounts fa
+    LEFT JOIN funding_account_reserve_transactions fart
+      ON fa.funding_account_id = fart.funding_account_id
+      AND fart.user_id = fa.user_id
+    WHERE fa.user_id = ?
+      AND fa.is_active = 1
+    GROUP BY fa.funding_account_id, fa.account_name
+    ORDER BY fa.account_name ASC
+  ");
+  $stmt->execute([$user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $totals = [];
+
+  foreach ($rows as $row) {
+    $account_name = trim((string)$row['account_name']);
+    if ($account_name === '') {
+      continue;
+    }
+
+    $totals[$account_name] = round((float)$row['total_amount'], 2);
+  }
+
+  return $totals;
 }

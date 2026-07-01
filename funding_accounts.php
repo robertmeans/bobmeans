@@ -33,6 +33,7 @@ require '_includes/nav.php';
     <table>
       <thead>
         <tr>
+          <th>Ledger</th>
           <th>Account Name</th>
           <th>Nickname</th>
           <th>Type</th>
@@ -46,6 +47,9 @@ require '_includes/nav.php';
       <?php foreach ($rows as $row): ?>
 
         <tr class="<?php echo ((int)$row['is_active'] === 1) ? 'active-row' : 'inactive-row'; ?>">
+          <td>
+            <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Ledger</a>
+          </td>
           <td><?php echo htmlspecialchars($row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>
 
           <td><?php echo htmlspecialchars((string)$row['account_nickname'], ENT_QUOTES, 'UTF-8'); ?></td>
