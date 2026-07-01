@@ -565,7 +565,8 @@ function generate_projected_bill_events(array $rows, int $months_ahead = 12): ar
         'cadence' => (string)($row['cadence'] ?? ''),
         'due_date' => $cursor->format('Y-m-d'),
         'amount' => $base_amount,
-        'paid_from_account' => (string)($row['paid_from_account'] ?? '')
+        'paid_from_account' => (string)($row['paid_from_account'] ?? ''),
+        'default_funding_account_id' => $row['default_funding_account_id'] ?? null
       ];
 
       $cursor->modify('+' . $cycle_months . ' months');
@@ -645,13 +646,16 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
   $billing_account_id = (int)$bill['billing_account_id'];
   $user_id = (int)$bill['user_id'];
   $amount = base_amount_for_bill($bill);
-  $reserve_balance = round((float)($bill['reserve_balance'] ?? 0), 2);
 
   if ($amount <= 0) {
     return false;
   }
 
-  if ($reserve_balance < $amount) {
+  $funding_account_id = isset($bill['default_funding_account_id'])
+    ? (int)$bill['default_funding_account_id']
+    : 0;
+
+  if ($funding_account_id < 1) {
     return false;
   }
 
@@ -659,9 +663,10 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
     return false;
   }
 
-  $new_reserve_balance = round($reserve_balance - $amount, 2);
-  if ($new_reserve_balance < 0) {
-    $new_reserve_balance = 0.00;
+  $current_pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+
+  if ($current_pool_balance < $amount) {
+    return false;
   }
 
   $months_to_advance = months_to_advance_for_bill($bill, 1);
@@ -704,19 +709,36 @@ function process_single_due_draft(PDO $pdo_db, array $bill, string $due_date): b
       INSERT INTO funding_account_reserve_transactions (
         funding_account_id,
         user_id,
+        billing_account_id,
         transaction_type,
         amount,
         transaction_date,
         note
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->execute([
-      (int)$bill['default_funding_account_id'],
+      $funding_account_id,
       $user_id,
+      $billing_account_id,
       'deduction',
       $amount,
       $due_date . ' 00:00:00',
       'Automatic draft deduction for ' . $bill['billing_name']
+    ]);
+
+    $stmt = $pdo_db->prepare("
+      UPDATE billing_accounts
+      SET
+        actual_due_date = ?,
+        updated_at = NOW()
+      WHERE billing_account_id = ?
+        AND user_id = ?
+      LIMIT 1
+    ");
+    $stmt->execute([
+      $next_actual_due->format('Y-m-d'),
+      $billing_account_id,
+      $user_id
     ]);
 
     $pdo_db->commit();
@@ -1354,16 +1376,13 @@ function funding_account_ledger_rows(PDO $pdo_db, int $user_id, int $funding_acc
 {
   $ledger = [];
 
-  /*
-    funding-account reserve transactions are the only real money movements
-  */
   $stmt = $pdo_db->prepare("
     SELECT
       fart.transaction_date AS event_datetime,
       'account_transaction' AS event_type,
       fart.transaction_type AS sub_type,
-      NULL AS billing_account_id,
-      NULL AS billing_name,
+      fart.billing_account_id,
+      ba.billing_name,
       fa.account_name,
       fart.note AS note,
       CASE
@@ -1373,6 +1392,8 @@ function funding_account_ledger_rows(PDO $pdo_db, int $user_id, int $funding_acc
     FROM funding_account_reserve_transactions fart
     INNER JOIN funding_accounts fa
       ON fart.funding_account_id = fa.funding_account_id
+    LEFT JOIN billing_accounts ba
+      ON fart.billing_account_id = ba.billing_account_id
     WHERE fart.user_id = ?
       AND fart.funding_account_id = ?
   ");
@@ -1455,4 +1476,106 @@ function funding_account_pool_totals(PDO $pdo_db, int $user_id): array
   }
 
   return $totals;
+}
+
+function recent_bill_activity(PDO $pdo_db, int $user_id, int $limit = 5): array
+{
+  $activity = [];
+
+  /*
+    bill reserve transactions
+  */
+  $stmt = $pdo_db->prepare("
+    SELECT
+      brt.transaction_date AS event_datetime,
+      'bill_reserve' AS event_source,
+      brt.transaction_type AS event_type,
+      ba.billing_account_id,
+      ba.billing_name,
+      brt.amount,
+      brt.note
+    FROM bill_reserve_transactions brt
+    INNER JOIN billing_accounts ba
+      ON brt.billing_account_id = ba.billing_account_id
+    WHERE brt.user_id = ?
+  ");
+  $stmt->execute([$user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  foreach ($rows as $row) {
+    $activity[] = [
+      'event_datetime' => $row['event_datetime'],
+      'event_source' => $row['event_source'],
+      'event_type' => $row['event_type'],
+      'billing_account_id' => $row['billing_account_id'],
+      'billing_name' => $row['billing_name'],
+      'signed_amount' => ((string)$row['event_type'] === 'deduction')
+        ? -(float)$row['amount']
+        : (float)$row['amount'],
+      'note' => $row['note']
+    ];
+  }
+
+  /*
+    bill payments
+  */
+  $stmt = $pdo_db->prepare("
+    SELECT
+      CONCAT(bp.date_paid, ' 00:00:00') AS event_datetime,
+      'bill_payment' AS event_source,
+      'paid' AS event_type,
+      ba.billing_account_id,
+      ba.billing_name,
+      bp.amount_paid AS amount,
+      bp.confirmation_note AS note
+    FROM bill_payments bp
+    INNER JOIN billing_accounts ba
+      ON bp.billing_account_id = ba.billing_account_id
+    WHERE bp.user_id = ?
+      AND bp.status = 'paid'
+  ");
+  $stmt->execute([$user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  foreach ($rows as $row) {
+    $activity[] = [
+      'event_datetime' => $row['event_datetime'],
+      'event_source' => $row['event_source'],
+      'event_type' => $row['event_type'],
+      'billing_account_id' => $row['billing_account_id'],
+      'billing_name' => $row['billing_name'],
+      'signed_amount' => -(float)$row['amount'],
+      'note' => $row['note']
+    ];
+  }
+
+  usort($activity, function ($a, $b) {
+    if ($a['event_datetime'] === $b['event_datetime']) {
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+    }
+
+    return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
+  });
+
+  return array_slice($activity, 0, $limit);
+}
+
+function funding_account_pool_balance_by_id(PDO $pdo_db, int $user_id, int $funding_account_id): float
+{
+  $stmt = $pdo_db->prepare("
+    SELECT
+      COALESCE(SUM(
+        CASE
+          WHEN transaction_type = 'deduction' THEN -amount
+          ELSE amount
+        END
+      ), 0) AS balance
+    FROM funding_account_reserve_transactions
+    WHERE user_id = ?
+      AND funding_account_id = ?
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+  return round((float)($row['balance'] ?? 0), 2);
 }

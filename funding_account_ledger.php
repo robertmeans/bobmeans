@@ -93,7 +93,7 @@ require '_includes/nav.php';
     <?php endif; ?>
 
     <?php if ($funding_accounts): ?>
-      <form method="get" style="margin-bottom: 1em;">
+      <form class="pro-acct" method="get" style="margin-bottom: 1em;"> 
         <label for="funding_account_id"><strong>Funding Account:</strong></label>
         <select id="funding_account_id" name="funding_account_id" onchange="this.form.submit()">
           <?php foreach ($funding_accounts as $account): ?>
@@ -150,15 +150,15 @@ require '_includes/nav.php';
                   ?>
                 </td>
 
-                <td>
-                  <?php if (!empty($row['billing_account_id'])): ?>
-                    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
-                      <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
-                    </a>
-                  <?php else: ?>
-                    &nbsp;
-                  <?php endif; ?>
-                </td>
+<td>
+  <?php if (!empty($row['billing_account_id'])): ?>
+    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
+      <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+    </a>
+  <?php else: ?>
+    &nbsp;
+  <?php endif; ?>
+</td>
 
                 <td><?php echo htmlspecialchars((string)$row['sub_type'], ENT_QUOTES, 'UTF-8'); ?></td>
 

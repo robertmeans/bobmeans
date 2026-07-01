@@ -55,7 +55,7 @@ $intake_note = $billing_account['intake_note'] ?? '';
 $cadence = $billing_account['cadence'] ?? 'monthly';
 $reserve_style = $billing_account['reserve_style'] ?? 'sinking_fund';
 $default_amount = isset($billing_account['default_amount']) ? (string)$billing_account['default_amount'] : '';
-$reserve_balance = isset($billing_account['reserve_balance']) ? (string)$billing_account['reserve_balance'] : '0.00';
+// $reserve_balance = isset($billing_account['reserve_balance']) ? (string)$billing_account['reserve_balance'] : '0.00';
 $next_due_date = $billing_account['next_due_date'] ?? '';
 $actual_due_date = $billing_account['actual_due_date'] ?? '';
 $renewal_term_months = isset($billing_account['renewal_term_months']) ? (string)$billing_account['renewal_term_months'] : '1';
@@ -76,7 +76,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
   $cadence = trim($_POST['cadence'] ?? 'monthly');
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
-  $reserve_balance = trim($_POST['reserve_balance'] ?? '0.00');
+  // $reserve_balance = trim($_POST['reserve_balance'] ?? '0.00');
   $next_due_date = trim($_POST['next_due_date'] ?? '');
   $actual_due_date = trim($_POST['actual_due_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '1');
@@ -105,9 +105,9 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
     $errors[] = 'Amount due must be numeric.';
   }
 
-  if ($reserve_balance === '' || !is_numeric($reserve_balance) || (float)$reserve_balance < 0) {
-    $errors[] = 'Reserve balance must be numeric.';
-  }
+  // if ($reserve_balance === '' || !is_numeric($reserve_balance) || (float)$reserve_balance < 0) {
+  //   $errors[] = 'Reserve balance must be numeric.';
+  // }
 
   if ($next_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
     $errors[] = 'Next due date must be in YYYY-MM-DD format.';
@@ -170,7 +170,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       cadence = ?,
       reserve_style = ?,
       default_amount = ?,
-      reserve_balance = ?,
+      -- reserve_balance = ?,
       next_due_date = ?,
       actual_due_date = ?,
       renewal_term_months = ?,
@@ -195,7 +195,7 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       $cadence,
       $reserve_style,
       $default_amount,
-      $reserve_balance,
+      // $reserve_balance,
       $next_due_date,
       $actual_due_date,
       $renewal_term_months,
@@ -277,10 +277,14 @@ require '_includes/nav.php';
             <input type="number" step="0.01" id="default_amount" name="default_amount" value="<?php echo htmlspecialchars($default_amount, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
 
+
+<?php /* 
           <div class="row">
             <label for="reserve_balance">In Reserves</label>
             <input type="number" step="0.01" id="reserve_balance" name="reserve_balance" value="<?php echo htmlspecialchars($reserve_balance, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
+*/ ?>
+
         </div>
 
         <div class="two-col">

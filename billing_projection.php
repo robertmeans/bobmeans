@@ -168,8 +168,11 @@ require '_includes/nav.php';
         /* this class goes in the next tr directly below... */
         ?>
         <tr class="<?php echo htmlspecialchars(implode(' ', $row_classes), ENT_QUOTES, 'UTF-8'); ?>">
+
+
           <td>
-            <a class="editAcctLink" href="edit_billing-account.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
+            <a class="editAcctLink" href="bill_details.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
+
         <?php if (false): ?>
             <?php if ($event['vendor_name'] !== ''): ?>
               <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>

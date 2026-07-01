@@ -57,16 +57,18 @@ if (is_post_request() && isset($_POST['submit_reserve_adjustment'])) {
       INSERT INTO funding_account_reserve_transactions (
         funding_account_id,
         user_id,
+        billing_account_id,
         transaction_type,
         amount,
         transaction_date,
         note
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
       (int)$funding_account_id,
       $user_id,
+      null,
       $transaction_type,
       (float)$adjustment_amount,
       date('Y-m-d H:i:s'),

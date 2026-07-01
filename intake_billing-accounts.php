@@ -524,7 +524,7 @@ require '_includes/nav.php';
       </form>
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Schedule</a> | <a href="billing_projection.php">Projection</a> | <a href="intake_funding-accounts.php">New Funding</a>
+      <a href="index.php">Dashboard</a> | <a href="billing_projection.php">Projection</a> | <a href="intake_funding-accounts.php">New Funding</a>
     </div>
 
   </div>

@@ -32,6 +32,7 @@ $stmt = $pdo_db->prepare("
     ba.due_day_of_month,
     ba.due_month_of_year,
     ba.is_active,
+    ba.default_funding_account_id,
     fa.account_name AS paid_from_account
   FROM billing_accounts ba
   LEFT JOIN funding_accounts fa
@@ -119,6 +120,8 @@ function homepage_amount_needed(array $row): float
 
 // $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
 $reserve_totals = funding_account_pool_totals($pdo_db, $user_id);
+
+$recent_bill_activity = recent_bill_activity($pdo_db, $user_id, 5);
 
 /*
   map billing rows by funding account
@@ -257,7 +260,9 @@ require '_includes/nav.php';
 
     <div class="inner-links">
       <a href="billing_projection.php">Projection</a> |
-      <a href="reserve_adjustment.php">Reserve Adjustment</a>
+      <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
+      <a href="funding_account_ledger.php">Funding Account Ledger</a>
+
     </div>
 
     <div class="dashboard-grid">
@@ -357,20 +362,35 @@ require '_includes/nav.php';
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($exceptions as $event): ?>
+              <?php foreach ($exceptions as $event):
+              $fund_account = htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8');
+              $fund_account_id = (int)$event['default_funding_account_id']; ?>
+
                 <tr class="<?php echo htmlspecialchars($event['status'], ENT_QUOTES, 'UTF-8'); ?>">
                   <td>
                     <a href="bill_details.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>">
                       <?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                   </td>
-                  <td>
-                    <?php if ($event['funding_account'] === 'PayPal') { ?>
-                      <a href="https://paypal.com" target="_blank"><img class="paypal-icon" src="_images/paypal.webp"></a>
-                    <?php } else {
-                      echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8');
-                    } ?>
-                  </td>
+
+
+
+
+
+<td>
+  <?php if (!empty($event['default_funding_account_id'])): ?>
+    <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$event['default_funding_account_id']; ?>">
+      <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+    </a>
+  <?php else: ?>
+    <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+  <?php endif; ?>
+</td>
+
+
+
+
+
                   <td>
                     <div class="wday nt">
                       <?php echo date('M', strtotime($event['due_date'])); ?>
@@ -393,7 +413,7 @@ require '_includes/nav.php';
       <div class="dashboard-card wide-card">
         <h2>Recent Bill Activity</h2>
 
-        <?php if ($recent_reserve_activity): ?>
+        <?php if ($recent_bill_activity): ?>
           <table class="full-width">
             <thead>
               <tr>
@@ -405,41 +425,42 @@ require '_includes/nav.php';
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($recent_reserve_activity as $row): ?>
+              <?php foreach ($recent_bill_activity as $row): ?>
                 <tr>
                   <td>
-                    <div class="wday">
-                      <?php
-                      echo !empty($row['transaction_date'])
-                        ? date("D,", strtotime($row['transaction_date']))
-                        : '';
-                      ?>
-                    </div>
-                    <div class="wday">
-                      <?php
-                      echo !empty($row['transaction_date'])
-                        ? date("m/d", strtotime($row['transaction_date']))
-                        : '';
-                      ?> 
-                    </div>
-                  </td>
-                  <td><?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo htmlspecialchars((string)$row['transaction_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  
-                  <td <?php if ((string)$row['transaction_type'] === 'deduction') { echo 'class="ded-red"'; } ?>>
                     <?php
-                    $sign = ((string)$row['transaction_type'] === 'deduction') ? '-' : '+';
-                    echo $sign . '$' . number_format((float)$row['amount'], 2);
+                    echo !empty($row['event_datetime'])
+                      ? date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']))
+                      : '';
                     ?>
                   </td>
-
+                  <td>
+                    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
+                      <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                  </td>
+                  <td>
+                    <?php
+                    if ($row['event_source'] === 'bill_payment') {
+                      echo 'payment';
+                    } else {
+                      echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8');
+                    }
+                    ?>
+                  </td>
+                  <td>
+                    <?php
+                    $sign = ((float)$row['signed_amount'] < 0) ? '-' : '+';
+                    echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2);
+                    ?>
+                  </td>
                   <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
           </table>
         <?php else: ?>
-          <p>No reserve activity yet.</p>
+          <p>No recent bill activity yet.</p>
         <?php endif; ?>
       </div>
 
