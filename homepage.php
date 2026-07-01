@@ -144,7 +144,8 @@ function homepage_account_projection_summary(array $rows_for_account, float $poo
   if ($first_attention) {
     return [
       'status' => $first_attention['status'],
-      'message' => date('m.d.y', strtotime($first_attention['due_date'])) . ' - ' . $first_attention['billing_name'],
+      // 'message' => date('m.d.y', strtotime($first_attention['due_date'])) . ' - ' . $first_attention['billing_name'],
+      'message' => date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($first_attention['due_date'])) . ' <span style="font-size:0.8em;display:inline-block;position:relative;top:-3px;margin:0 5px;">●</span> ',
       'remaining_due' => (float)$first_attention['remaining_due'],
       'due_date' => $first_attention['due_date']
     ];
@@ -155,7 +156,7 @@ function homepage_account_projection_summary(array $rows_for_account, float $poo
 
     return [
       'status' => 'covered',
-      'message' => 'Covered through ' . date('m.d.y', strtotime($last_event['due_date'])),
+      'message' => 'Covered through ' . date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($last_event['due_date'])),
       'due_date' => $last_event['due_date']
     ];
   }
@@ -186,6 +187,12 @@ foreach ($billing_rows as $row) {
   $rows_by_account[$account_name][] = $row;
 }
 
+
+/* this gives you the next bill due regardless of whether covered or not. see: 0630261135 */
+// $next_bill_countdown = days_until_next_bill_date($rows_by_account, $reserve_totals, 12);
+
+/* this gives you the next uncovered bill due date */
+$next_uncovered_bill = days_until_next_uncovered_bill_date($rows_by_account, $reserve_totals, 12);
 
 /* 
   left, unpaid, per month
@@ -402,17 +409,61 @@ require '_includes/nav.php';
       </div>
 */ ?>
 
-     
-      <div class="dashboard-card">
-        <h2>Next Round Total</h2>
-        <div class="dashboard-big">
-          $<?php echo number_format($total_underfunded, 2); ?>
-        </div>
-      </div>
+<?php /* this gives you the next bill due date regardless of covered or not. see: 0630261135 
+
+<div class="dashboard-card">
+  <h2>Next Bill Countdown</h2>
+
+  <?php if ($next_bill_countdown): ?>
+    <div class="dashboard-big">
+      <?php echo (int)$next_bill_countdown['days']; ?>
+    </div>
+    <div class="dashboard-line">
+      day<?php echo ((int)$next_bill_countdown['days'] === 1) ? '' : 's'; ?> until
+      <?php echo htmlspecialchars($next_bill_countdown['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+    <div class="dashboard-line">
+      <?php echo date('m.d.y', strtotime($next_bill_countdown['due_date'])); ?>
+      <?php if ($next_bill_countdown['funding_account'] !== ''): ?>
+        — <?php echo htmlspecialchars($next_bill_countdown['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
+    <p>No upcoming bills found.</p>
+  <?php endif; ?>
+</div>
+
+*/ ?>
 
       <div class="dashboard-card">
-        <h2>Next Up Per Account</h2>
-        <p>Today's date: <strong><?php echo date('m.d.y'); ?></strong></p>
+         <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);">Today is: </span> <?php echo date('l, F jS'); ?></h2>
+
+        <?php if ($next_uncovered_bill): ?>
+          <div class="dashboard-line">
+            <span style="font-size:2em;font-weight:700;"><?php echo (int)$next_uncovered_bill['days']; ?></span> &nbsp;day<?php echo ((int)$next_uncovered_bill['days'] === 1) ? '' : 's'; ?> 'til
+          </div>
+          <?php /* 
+          <div class="dashboard-line">
+            day<?php echo ((int)$next_uncovered_bill['days'] === 1) ? '' : 's'; ?> until
+            <?php echo htmlspecialchars($next_uncovered_bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+          </div>
+          */ ?>
+          <div class="dashboard-line">
+            <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
+            when <?php echo htmlspecialchars($next_uncovered_bill['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+          </div>
+          <div class="dashboard-line">
+            Needs $<?php echo number_format((float)$next_uncovered_bill['remaining_due'], 2); ?>
+          </div>
+        <?php else: ?>
+          <p>No uncovered bills found in the projection window.</p>
+        <?php endif; ?>
+      </div>
+
+
+
+      <div class="dashboard-card">
+        <h2>Next Due Per Funding Account</h2>
         <?php if ($account_attention_list): ?>
           <?php foreach ($account_attention_list as $item): ?>
             <?php
@@ -420,17 +471,26 @@ require '_includes/nav.php';
             $summary = $item['summary'];
             ?>
 
+
           <div class="dashboard-line <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
+
+
             <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong>
+
             <a class="account-jump" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">
               <?php if ($summary['status'] === 'partial' || $summary['status'] === 'due'): ?>
-                <?php echo htmlspecialchars($summary['message'], ENT_QUOTES, 'UTF-8'); ?>
-                - needs $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
+                <?php echo $summary['message']; ?>
+                 $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
               <?php else: ?>
-                <?php echo htmlspecialchars($summary['message'], ENT_QUOTES, 'UTF-8'); ?>
+                <?php echo $summary['message']; ?>
               <?php endif; ?>
             </a>
+
+
           </div>
+
+
+
 
           <?php endforeach; ?>
         <?php else: ?>
@@ -460,12 +520,12 @@ require '_includes/nav.php';
 <?php /*  this is what remains unpaid per month. 
           if you want to change # of months shown, search: 0629260931 */ ?>
       <div class="dashboard-card">
-        <h2>Still Needed by Month</h2>
+        <h2>Due by Month</h2>
 
         <?php if ($monthly_needed_totals): ?>
           <?php foreach ($monthly_needed_totals as $month_key => $amount): ?>
             <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
-              <strong><?php echo date('M Y', strtotime($month_key . '-01')); ?>:</strong>
+              <strong><?php echo date('F', strtotime($month_key . '-01')); ?>:</strong>
               $<?php echo number_format($amount, 2); ?>
             </div>
           <?php endforeach; ?>
@@ -523,8 +583,21 @@ require '_includes/nav.php';
                       <?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                   </td>
-                  <td><?php echo htmlspecialchars($event['funding_account'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>
+                  <td>
+                    <?php if ($event['funding_account'] === 'PayPal') { ?>
+                      <a href="https://paypal.com" target="_blank"><img class="paypal-icon" src="_images/paypal.webp"></a>
+                    <?php } else {
+                      echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8');
+                    } ?>
+                  </td>
+                  <td>
+                    <div class="wday nt">
+                      <?php echo date('M', strtotime($event['due_date'])); ?>
+                    </div>
+                    <div class="wday nt">
+                      <?php echo date('j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($event['due_date'])); ?>
+                    </div>
+                  </td>
                   <td><?php echo htmlspecialchars(ucfirst($event['status']), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
                 </tr>
@@ -554,11 +627,20 @@ require '_includes/nav.php';
               <?php foreach ($recent_reserve_activity as $row): ?>
                 <tr>
                   <td>
-                    <?php
-                    echo !empty($row['transaction_date'])
-                      ? date("m.d.y \\a\\t H:i", strtotime($row['transaction_date']))
-                      : '';
-                    ?>
+                    <div class="wday">
+                      <?php
+                      echo !empty($row['transaction_date'])
+                        ? date("D,", strtotime($row['transaction_date']))
+                        : '';
+                      ?>
+                    </div>
+                    <div class="wday">
+                      <?php
+                      echo !empty($row['transaction_date'])
+                        ? date("m/d", strtotime($row['transaction_date']))
+                        : '';
+                      ?> 
+                    </div>
                   </td>
                   <td><?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?></td>
                   <td><?php echo htmlspecialchars((string)$row['transaction_type'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -601,7 +683,7 @@ require '_includes/nav.php';
                   <td>
                     <?php
                     echo !empty($row['transaction_date'])
-                      ? date("m.d.y \\a\\t H:i", strtotime($row['transaction_date']))
+                      ? date("D, m/d \\a\\t H:i", strtotime($row['transaction_date']))
                       : '';
                     ?>
                   </td>

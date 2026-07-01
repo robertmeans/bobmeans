@@ -57,7 +57,7 @@ require '_includes/nav.php';
 ?>
 
 <div class="intake-form">
-  <div class="billing-schedule">
+  <div class="billing-schedule projection">
 
     <?php /* <h1>Billing Projection</h1> */ ?>
 
@@ -92,7 +92,6 @@ require '_includes/nav.php';
         </div>
       <?php endif; ?>
 
-
       <div class="paypal-running-balance">
         <?php if ($skip !== 'yes') { ?>
         <?php foreach ($reserve_totals as $account_name => $amount): ?>
@@ -106,13 +105,15 @@ require '_includes/nav.php';
         <?php endforeach; ?>
         <?php } ?>
 
-        <div style="margin: 0.5em 0 0.5em;">
-          <strong><?php echo htmlspecialchars($selected_account, ENT_QUOTES, 'UTF-8'); ?> Reserve Used In Projection:</strong>
+        <div style="display: flex;margin: 0.5em 0 0.5em;">
+          <?php if ($selected_account === 'PayPal') { ?>
+          <a href="https://paypal.com" target="_blank"><img class="paypal-icon bnav" src="_images/paypal.webp"></a>
+        <?php } else {
+          echo '<strong>' . htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8');
+        } ?> Reserve Used In Projection:</strong>
           $<?php echo number_format($projection['starting_pool'], 2); ?>
         </div>
       </div>
-
-
     <div class="table-container">
     <table>
       <thead>

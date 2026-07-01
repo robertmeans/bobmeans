@@ -149,7 +149,7 @@ require '_includes/nav.php';
 
 
     <div class="inner-links">
-      <a href="billing_schedule.php">Schedule</a> | <a href="intake_billing-accounts.php">New Bill</a>
+      <a href="index.php">Dashboard</a> | <a href="billing_projection.php">Projection</a>
     </div>
 
   </div>

@@ -1123,3 +1123,105 @@ function dashboard_monthly_needed_totals(array $rows, float $pool_amount, int $m
 
   return $totals;
 }
+
+function days_until_next_bill_date(array $rows_by_account, array $reserve_totals, int $months_ahead = 12): ?array
+{
+  $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
+  $all_events = [];
+
+  foreach ($rows_by_account as $account_name => $rows_for_account) {
+    $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+
+    $events = generate_projected_bill_events($rows_for_account, $months_ahead);
+    $projection = apply_pool_to_projected_events($events, $pool_amount);
+
+    foreach ($projection['events'] as $event) {
+      if (!empty($event['due_date'])) {
+        $all_events[] = array_merge($event, [
+          'funding_account' => $account_name
+        ]);
+      }
+    }
+  }
+
+  if (!$all_events) {
+    return null;
+  }
+
+  usort($all_events, function ($a, $b) {
+    if ($a['due_date'] === $b['due_date']) {
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+    }
+
+    return strcmp((string)$a['due_date'], (string)$b['due_date']);
+  });
+
+  $next_event = $all_events[0];
+  $next_date = new DateTime($next_event['due_date']);
+  $next_date->setTime(0, 0, 0);
+
+  $days = (int)$today->diff($next_date)->format('%r%a');
+
+  return [
+    'days' => $days,
+    'due_date' => $next_event['due_date'],
+    'billing_name' => $next_event['billing_name'],
+    'funding_account' => $next_event['funding_account'],
+    'status' => $next_event['status'] ?? ''
+  ];
+}
+
+function days_until_next_uncovered_bill_date(array $rows_by_account, array $reserve_totals, int $months_ahead = 12): ?array
+{
+  $today = new DateTime('today');
+  $today->setTime(0, 0, 0);
+
+  $uncovered_events = [];
+
+  foreach ($rows_by_account as $account_name => $rows_for_account) {
+    $pool_amount = isset($reserve_totals[$account_name]) ? (float)$reserve_totals[$account_name] : 0.00;
+
+    $events = generate_projected_bill_events($rows_for_account, $months_ahead);
+    $projection = apply_pool_to_projected_events($events, $pool_amount);
+
+    foreach ($projection['events'] as $event) {
+      if (
+        !empty($event['due_date']) &&
+        ($event['status'] === 'partial' || $event['status'] === 'due')
+      ) {
+        $uncovered_events[] = array_merge($event, [
+          'funding_account' => $account_name
+        ]);
+      }
+    }
+  }
+
+  if (!$uncovered_events) {
+    return null;
+  }
+
+  usort($uncovered_events, function ($a, $b) {
+    if ($a['due_date'] === $b['due_date']) {
+      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+    }
+
+    return strcmp((string)$a['due_date'], (string)$b['due_date']);
+  });
+
+  $next_event = $uncovered_events[0];
+  $next_date = new DateTime($next_event['due_date']);
+  $next_date->setTime(0, 0, 0);
+
+  $days = (int)$today->diff($next_date)->format('%r%a');
+
+  return [
+    'days' => $days,
+    'due_date' => $next_event['due_date'],
+    'billing_name' => $next_event['billing_name'],
+    'funding_account' => $next_event['funding_account'],
+    'status' => $next_event['status'],
+    'remaining_due' => (float)$next_event['remaining_due']
+  ];
+}

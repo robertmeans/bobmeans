@@ -137,3 +137,10 @@ table.full-width {
 .fpdue {
   font-weight: bold;
 }
+.wday {
+  display: inline-block;
+  width: 45px;
+  &.nt {
+    width: 30px;
+  }
+}

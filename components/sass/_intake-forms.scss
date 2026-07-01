@@ -178,11 +178,6 @@ table {
   tr:nth-child(even) {
     background-color: rgba(255,255,255,0.8);
   }
-
-
-
-
-
   tr.thisYear {
     background-color: #ffc000;
     &:nth-child(even) {
@@ -204,7 +199,6 @@ table {
     }
   }
 
-
   // tr.partial
   tr.first-partial {
     background-color: #fff54f;
@@ -214,7 +208,6 @@ table {
     background-color: #ffd84f;
     color: #000;
   }
-
 
   tr.tbr {
     background-color: #313131;
@@ -234,11 +227,25 @@ table {
     color: #fff;
   }
 }
+.billing-schedule.projection {
+  table {
+    tr.paid,
+    tr.partial,
+    tr.due {
+      td {
+        padding: 5px;
+      }
+    }
+  }
+}
 .conicon {
   margin-right: 1em;
 }
 .paypal-icon {
   max-width: 16px;
+  &.bnav {
+    margin-right: .75em;
+  }
 }
 .table-container {
   max-height: 65vh;
