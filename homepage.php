@@ -212,15 +212,19 @@ require '_includes/nav.php';
           $days = (int)$today->diff($next_date)->format('%r%a');
           ?>
           <div class="dashboard-line">
-            <span style="font-size:2em;font-weight:700;"><?php echo $days; ?></span> &nbsp;day<?php echo ($days === 1) ? '' : 's'; ?> 'til
+            <span style="font-size:2em;font-weight:700;"><?php echo $days; ?></span> &nbsp;day<?php echo ($days === 1) ? '' : 's'; ?> 'til <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
             
           </div>
+
           <div class="dashboard-line">
-            <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
-            when <?php echo htmlspecialchars($next_uncovered_bill['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+            When
+            <a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$next_uncovered_bill['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$next_uncovered_bill['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$next_uncovered_bill['billing_name']); ?>">
+              <?php echo htmlspecialchars($next_uncovered_bill['funding_account'], ENT_QUOTES, 'UTF-8'); ?> needs $<?php echo number_format((float)$next_uncovered_bill['remaining_due'], 2); ?>
+            </a>
           </div>
+
           <div class="dashboard-line">
-            Needs $<?php echo number_format((float)$next_uncovered_bill['remaining_due'], 2); ?> to cover <?php echo htmlspecialchars($next_uncovered_bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+             To cover <?php echo htmlspecialchars($next_uncovered_bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
           </div>
 
         <?php else: ?>
@@ -315,12 +319,6 @@ require '_includes/nav.php';
                     <?php endif; ?>
                   </td>
 
-
-
-
-
-
-
                   <td>
                     <div class="wday nt">
                       <?php echo date('M', strtotime($event['due_date'])); ?>
@@ -329,14 +327,6 @@ require '_includes/nav.php';
                       <?php echo date('j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($event['due_date'])); ?>
                     </div>
                   </td>
-
-
-
-
-
-
-
-
 
                   <td><?php echo htmlspecialchars(ucfirst($event['status']), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>

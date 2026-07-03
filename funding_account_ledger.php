@@ -92,8 +92,6 @@ require '_includes/nav.php';
       </div>
     <?php endif; ?>
 
-
-
     <?php 
     /*  $single_fund_acct = determine whether there is more than 1 funding account
         in order to present accordingly (e.g., dropdown or no dropdown,
@@ -123,9 +121,6 @@ require '_includes/nav.php';
       You only have 1 funding account.
     <?php } ?>
 
-
-
-
     <?php if ($funding_account): ?>
       <div class="success" style="display:block;">
 
@@ -133,7 +128,7 @@ require '_includes/nav.php';
         Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
 
         <?php if (!empty($funding_account['login_url'])): ?>
-          <br><a href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+          <br><a class="btn-one" href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
             Login to <?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
           </a><br>
         <?php endif; ?>

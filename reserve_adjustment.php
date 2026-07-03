@@ -10,16 +10,33 @@ $errors = [];
 $saved = isset($_GET['saved']) && $_GET['saved'] === '1';
 
 $funding_account_id = '';
-$transaction_type = 'contribution';
 $adjustment_amount = '';
 $adjustment_note = '';
+
+if (isset($_GET['funding_account_id']) && ctype_digit((string)$_GET['funding_account_id'])) {
+  $funding_account_id = (string)(int)$_GET['funding_account_id'];
+}
+
+if (isset($_GET['amount']) && is_numeric($_GET['amount']) && (float)$_GET['amount'] > 0) {
+  $adjustment_amount = number_format((float)$_GET['amount'], 2, '.', '');
+}
+
+if (isset($_GET['transaction_type']) && in_array($_GET['transaction_type'], ['contribution', 'deduction', 'adjustment'], true)) {
+  $transaction_type = $_GET['transaction_type'];
+} else {
+  $transaction_type = 'contribution';
+}
+
+if (isset($_GET['bill']) && trim($_GET['bill']) !== '' && $adjustment_note === '') {
+  $adjustment_note = 'Added from homepage for upcoming bill: ' . trim($_GET['bill']);
+}
 
 $funding_accounts = funding_account_selector_options($pdo_db, $user_id);
 
 if (is_post_request() && isset($_POST['submit_reserve_adjustment'])) {
   $funding_account_id = trim($_POST['funding_account_id'] ?? '');
   $transaction_type = trim($_POST['transaction_type'] ?? 'contribution');
-  $adjustment_amount = trim($_POST['adjustment_amount'] ?? '');
+  $adjustment_amount = str_replace(',', '', trim($_POST['adjustment_amount'] ?? ''));
   $adjustment_note = trim($_POST['adjustment_note'] ?? '');
 
   if ($funding_account_id === '' || !ctype_digit((string)$funding_account_id)) {
@@ -114,6 +131,17 @@ require '_includes/nav.php';
       </div>
     <?php endif; ?>
 
+
+<?php if (isset($_GET['bill']) && trim($_GET['bill']) !== '' && isset($_GET['amount']) && is_numeric($_GET['amount'])): ?>
+  <div class="success" style="display:block;">
+    Suggested contribution for <?php echo htmlspecialchars(trim((string)$_GET['bill']), ENT_QUOTES, 'UTF-8'); ?>:
+    $<?php echo number_format((float)$_GET['amount'], 2); ?>
+  </div>
+<?php endif; ?>
+
+
+
+
     <form method="post">
       <input type="hidden" name="submit_reserve_adjustment" value="1">
 
@@ -164,8 +192,7 @@ require '_includes/nav.php';
       <div class="row">
         <label for="adjustment_amount">Amount</label>
         <input
-          type="number"
-          step="0.01"
+          type="text"
           id="adjustment_amount"
           name="adjustment_amount"
           value="<?php echo htmlspecialchars($adjustment_amount, ENT_QUOTES, 'UTF-8'); ?>"

@@ -18,6 +18,23 @@ a {
   &:visited {
     color: #0000ee;
   }
+  &.btn-one {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 8px 15px;
+    margin: .5em 0;
+    background-color: rgba(38,80,132,1);
+    border: 1px solid rgba(255,255,255,1);
+    border-radius: 8px;
+    color: #fff;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    &:hover {
+      text-decoration: none;
+      background-color: rgba(38,80,132,0.6);
+    }
+  }
 }
 
 .hmmsg {
