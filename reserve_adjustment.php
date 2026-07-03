@@ -188,7 +188,7 @@ require '_includes/nav.php';
 
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
-      <a href="billing_projection.php">Billing Projection</a>
+      <a href="billing_projection.php">Projection</a>
     </div>
 
   </div>

@@ -36,6 +36,7 @@ if ($funding_account_id < 1) {
 
 /* defaults */
 $account_name = $funding_account['account_name'] ?? '';
+$login_url = $funding_account['login_url'] ?? '';
 $account_nickname = $funding_account['account_nickname'] ?? '';
 $account_type = $funding_account['account_type'] ?? 'other';
 $is_active = isset($funding_account['is_active']) ? (int)$funding_account['is_active'] : 1;
@@ -43,12 +44,17 @@ $is_active = isset($funding_account['is_active']) ? (int)$funding_account['is_ac
 /* update */
 if (is_post_request() && isset($_POST['update_funding_account']) && $funding_account) {
   $account_name = trim($_POST['account_name'] ?? '');
+  $login_url = trim($_POST['login_url'] ?? '');
   $account_nickname = trim($_POST['account_nickname'] ?? '');
   $account_type = trim($_POST['account_type'] ?? 'other');
   $is_active = isset($_POST['is_active']) ? 1 : 0;
 
   if ($account_name === '') {
     $errors[] = 'Account name is required.';
+  }
+
+  if ($login_url !== '' && !filter_var($login_url, FILTER_VALIDATE_URL)) {
+    $errors[] = 'Login URL must be a valid URL.';
   }
 
   if (!in_array($account_type, ['checking', 'credit_card', 'paypal', 'savings', 'other'], true)) {
@@ -76,6 +82,7 @@ if (is_post_request() && isset($_POST['update_funding_account']) && $funding_acc
       UPDATE funding_accounts
       SET
         account_name = ?,
+        login_url = ?,
         account_nickname = ?,
         account_type = ?,
         is_active = ?,
@@ -87,6 +94,7 @@ if (is_post_request() && isset($_POST['update_funding_account']) && $funding_acc
 
     $stmt->execute([
       $account_name,
+      $login_url !== '' ? $login_url : null,
       $account_nickname !== '' ? $account_nickname : null,
       $account_type,
       $is_active,
@@ -144,6 +152,17 @@ require '_includes/nav.php';
               value="<?php echo htmlspecialchars((string)$account_nickname, ENT_QUOTES, 'UTF-8'); ?>"
             >
           </div>
+        </div>
+
+        <div class="row standalone">
+          <label for="login_url">Login URL</label>
+          <input
+            type="url"
+            id="login_url"
+            name="login_url"
+            value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
+            placeholder="https://example.com/login"
+          >
         </div>
 
         <div class="two-col">

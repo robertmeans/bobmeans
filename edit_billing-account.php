@@ -55,7 +55,6 @@ $intake_note = $billing_account['intake_note'] ?? '';
 $cadence = $billing_account['cadence'] ?? 'monthly';
 $reserve_style = $billing_account['reserve_style'] ?? 'sinking_fund';
 $default_amount = isset($billing_account['default_amount']) ? (string)$billing_account['default_amount'] : '';
-// $reserve_balance = isset($billing_account['reserve_balance']) ? (string)$billing_account['reserve_balance'] : '0.00';
 $next_due_date = $billing_account['next_due_date'] ?? '';
 $actual_due_date = $billing_account['actual_due_date'] ?? '';
 $renewal_term_months = isset($billing_account['renewal_term_months']) ? (string)$billing_account['renewal_term_months'] : '1';
@@ -76,7 +75,6 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
   $cadence = trim($_POST['cadence'] ?? 'monthly');
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
-  // $reserve_balance = trim($_POST['reserve_balance'] ?? '0.00');
   $next_due_date = trim($_POST['next_due_date'] ?? '');
   $actual_due_date = trim($_POST['actual_due_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '1');
@@ -105,13 +103,9 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
     $errors[] = 'Amount due must be numeric.';
   }
 
-  // if ($reserve_balance === '' || !is_numeric($reserve_balance) || (float)$reserve_balance < 0) {
-  //   $errors[] = 'Reserve balance must be numeric.';
+  // if ($next_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
+  //   $errors[] = 'Next due date must be in YYYY-MM-DD format.';
   // }
-
-  if ($next_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
-    $errors[] = 'Next due date must be in YYYY-MM-DD format.';
-  }
 
   if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
     $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
@@ -170,7 +164,6 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       cadence = ?,
       reserve_style = ?,
       default_amount = ?,
-      -- reserve_balance = ?,
       next_due_date = ?,
       actual_due_date = ?,
       renewal_term_months = ?,
@@ -195,7 +188,6 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       $cadence,
       $reserve_style,
       $default_amount,
-      // $reserve_balance,
       $next_due_date,
       $actual_due_date,
       $renewal_term_months,
@@ -262,45 +254,25 @@ require '_includes/nav.php';
             </select>
           </div>
 
+
+
           <div class="row">
-            <label for="reserve_style">Reserve Style</label>
-            <select id="reserve_style" name="reserve_style">
-              <option value="sinking_fund" <?php echo ($reserve_style === 'sinking_fund') ? 'selected' : ''; ?>>Sinking Fund</option>
-              <option value="prepaid" <?php echo ($reserve_style === 'prepaid') ? 'selected' : ''; ?>>Prepaid</option>
-            </select>
+            <label for="renewal_term_months">Renewal Term (Months)</label>
+            <input type="number" id="renewal_term_months" name="renewal_term_months" min="1" value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
         </div>
 
-        <div class="two-col">
-          <div class="row">
-            <label for="default_amount">Amount Due</label>
-            <input type="number" step="0.01" id="default_amount" name="default_amount" value="<?php echo htmlspecialchars($default_amount, ENT_QUOTES, 'UTF-8'); ?>" required>
-          </div>
 
 
-<?php /* 
-          <div class="row">
-            <label for="reserve_balance">In Reserves</label>
-            <input type="number" step="0.01" id="reserve_balance" name="reserve_balance" value="<?php echo htmlspecialchars($reserve_balance, ENT_QUOTES, 'UTF-8'); ?>" required>
-          </div>
-*/ ?>
 
-        </div>
 
         <div class="two-col">
-          <div class="row">
-            <label for="next_due_date">Next Due Date</label>
-            <input
-              type="date"
-              id="next_due_date"
-              name="next_due_date"
-              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-              required
-            >
-          </div>
 
           <div class="row">
-            <label for="actual_due_date">Actual Due Date</label>
+            <?php /* Previously 'Actual Due Date' - renamed for clarity.
+            <label for="actual_due_date">Actual Due Date</label> 
+            */ ?>
+             <label for="actual_due_date">Next Calendar Due Date</label>
             <input
               type="date"
               id="actual_due_date"
@@ -309,32 +281,57 @@ require '_includes/nav.php';
               required
             >
           </div>
-        </div>
-
-        <div class="two-col">
-          <div class="row">
-            <label for="renewal_term_months">Renewal Term (Months)</label>
-            <input type="number" id="renewal_term_months" name="renewal_term_months" min="1" value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>" required>
-          </div>
 
           <div class="row">
+            <?php /* 
+            <label for="next_due_date">Next Due Date</label>
+            <input
+              type="date"
+              id="next_due_date"
+              name="next_due_date"
+              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+            */ ?>
             &nbsp;
           </div>
+
+
         </div>
 
+
         <div class="two-col">
+
+          <div class="row" id="due-month-wrap">
+            <label for="due_month_of_year">Due Month of Year</label>
+            <input type="number" id="due_month_of_year" name="due_month_of_year" min="1" max="12" value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>">
+          </div>
+
+
           <div class="row">
             <label for="due_day_of_month">Due Day of Month</label>
             <input type="number" id="due_day_of_month" name="due_day_of_month" min="1" max="31" value="<?php echo htmlspecialchars((string)$due_day_of_month, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
 
-          <div class="row">
-            <label for="due_month_of_year">Due Month of Year</label>
-            <input type="number" id="due_month_of_year" name="due_month_of_year" min="1" max="12" value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
+
         </div>
 
+
+
         <div class="two-col">
+          <div class="row">
+            <label for="default_amount">Amount Due</label>
+            <input type="number" step="0.01" id="default_amount" name="default_amount" value="<?php echo htmlspecialchars($default_amount, ENT_QUOTES, 'UTF-8'); ?>" required>
+          </div>
+
+        </div>
+
+
+
+
+
+        <div class="two-col">
+
           <div class="row">
             <label for="default_funding_account_id">Paid From Account</label>
             <select id="default_funding_account_id" name="default_funding_account_id">
@@ -345,6 +342,22 @@ require '_includes/nav.php';
                 </option>
               <?php endforeach; ?>
             </select>
+          </div>
+
+          <div class="row">
+            <label for="reserve_style">Reserve Style</label>
+            <select id="reserve_style" name="reserve_style">
+              <option value="sinking_fund" <?php echo ($reserve_style === 'sinking_fund') ? 'selected' : ''; ?>>Sinking Fund</option>
+              <option value="prepaid" <?php echo ($reserve_style === 'prepaid') ? 'selected' : ''; ?>>Prepaid</option>
+            </select>
+          </div>
+
+        </div>
+
+        <?php /*
+        <div class="two-col">
+          <div class="row">
+            &nbsp;
           </div>
 
           <div class="row">
@@ -359,6 +372,8 @@ require '_includes/nav.php';
             </select>
           </div>
         </div>
+        */ ?>
+
 
         <div class="row standalone">
           <label for="intake_note">Billing Memo</label>

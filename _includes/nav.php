@@ -50,8 +50,6 @@
       <a class="sn <?php if ($layout_context === 'intakeBilling') { echo 'active'; } ?>" href="intake_billing-accounts.php">Add New Bill</a>
       
       <a class="sn <?php if ($layout_context === 'intakeFunding') { echo 'active'; } ?>" href="intake_funding-accounts.php">Add New Funding</a>
-
-      <a class="sn legacy <?php if ($layout_context === 'schedule') { echo 'active'; } ?>" href="billing_schedule.php">Legacy: Schedule</a>
       
       
       <a href="logout.php" class="sn logout" onclick="closeNav();"><i class="fas far fa-power-off"></i> Logout</a>

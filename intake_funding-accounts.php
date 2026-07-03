@@ -11,17 +11,23 @@ $success = '';
 
 $account_name = '';
 $account_nickname = '';
+$login_url = '';
 $account_type = 'other';
 $is_active = 1;
 
 if (is_post_request() && isset($_POST['create_funding_account'])) {
   $account_name = trim($_POST['account_name'] ?? '');
   $account_nickname = trim($_POST['account_nickname'] ?? '');
+  $login_url = trim($_POST['login_url'] ?? '');
   $account_type = trim($_POST['account_type'] ?? 'other');
   $is_active = isset($_POST['is_active']) ? 1 : 0;
 
   if ($account_name === '') {
     $errors[] = 'Account name is required.';
+  }
+
+  if ($login_url !== '' && !filter_var($login_url, FILTER_VALIDATE_URL)) {
+    $errors[] = 'Login URL must be a valid URL.';
   }
 
   if (!in_array($account_type, ['checking', 'credit_card', 'paypal', 'savings', 'other'], true)) {
@@ -48,15 +54,17 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
       INSERT INTO funding_accounts (
         user_id,
         account_name,
+        login_url,
         account_nickname,
         account_type,
         is_active
-      ) VALUES (?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
       $user_id,
       $account_name,
+      $login_url !== '' ? $login_url : null,
       $account_nickname !== '' ? $account_nickname : null,
       $account_type,
       $is_active
@@ -65,6 +73,7 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
     $success = 'Funding account added.';
 
     $account_name = '';
+    $login_url = '';
     $account_nickname = '';
     $account_type = 'other';
     $is_active = 1;
@@ -119,6 +128,17 @@ require '_includes/nav.php';
           value="<?php echo htmlspecialchars($account_nickname, ENT_QUOTES, 'UTF-8'); ?>"
         >
       </div>
+    </div>
+
+    <div class="row standalone">
+      <label for="login_url">Login URL</label>
+      <input
+        type="url"
+        id="login_url"
+        name="login_url"
+        value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
+        placeholder="https://example.com/login"
+      >
     </div>
 
     <div class="two-col">

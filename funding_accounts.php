@@ -7,13 +7,7 @@ $user_id = $_SESSION['id'] ?? 1;
 $layout_context = 'fundingAccts';
 
 $stmt = $pdo_db->prepare("
-  SELECT
-    funding_account_id,
-    account_name,
-    account_nickname,
-    account_type,
-    is_active,
-    created_at
+  SELECT *
   FROM funding_accounts
   WHERE user_id = ?
   ORDER BY account_name ASC
@@ -30,16 +24,22 @@ require '_includes/nav.php';
 
     <h1>Funding Accounts</h1>
 
+    <?php if (isset($_GET['archived']) && $_GET['archived'] === '1'): ?>
+      <div class="success" style="display:block;">
+        Funding account archived.
+      </div>
+    <?php endif; ?>
+
     <table>
       <thead>
         <tr>
-          <th>Ledger</th>
           <th>Account Name</th>
           <th>Nickname</th>
           <th>Type</th>
           <th>Active</th>
           <th>Created</th>
-          <th>Edit</th>
+          <th>Website</th>
+          <th>Manage</th>
         </tr>
       </thead>
       <tbody>
@@ -47,9 +47,7 @@ require '_includes/nav.php';
       <?php foreach ($rows as $row): ?>
 
         <tr class="<?php echo ((int)$row['is_active'] === 1) ? 'active-row' : 'inactive-row'; ?>">
-          <td>
-            <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Ledger</a>
-          </td>
+
           <td><?php echo htmlspecialchars($row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>
 
           <td><?php echo htmlspecialchars((string)$row['account_nickname'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -60,9 +58,24 @@ require '_includes/nav.php';
 
           <td><?php echo date("m.d.y \\a\\t H:i", strtotime(htmlspecialchars((string)$row['created_at'], ENT_QUOTES, 'UTF-8'))); ?></td>
 
+
+          <td>
+            <?php if (!empty($row['login_url'])): ?>
+              <a href="<?php echo htmlspecialchars((string)$row['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">Website</a>
+              <?php else: echo ''; ?>
+            <?php endif; ?>
+          </td>
+
           <td>
             <a href="edit_funding-account.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Edit</a>
+            |
+            <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Ledger</a>
+            <?php if ((int)$row['is_active'] === 1): ?>
+              |
+              <a href="close_funding-account.php?funding_account_id=<?php echo (int)$row['funding_account_id']; ?>">Archive</a>
+            <?php endif; ?>
           </td>
+
         </tr>
       <?php endforeach; ?>
 

@@ -9,19 +9,7 @@ $layout_context = 'billAcccounts';
 
 $stmt = $pdo_db->prepare("
   SELECT
-    ba.billing_account_id,
-    ba.billing_name,
-    ba.vendor_name,
-    ba.cadence,
-    ba.reserve_style,
-    ba.default_amount,
-    ba.reserve_balance,
-    ba.next_due_date,
-    ba.renewal_term_months,
-    ba.due_day_of_month,
-    ba.due_month_of_year,
-    ba.is_autopay,
-    ba.is_active,
+    ba.*,
     fa.account_name AS paid_from_account
   FROM billing_accounts ba
   LEFT JOIN funding_accounts fa
@@ -40,6 +28,13 @@ require '_includes/nav.php';
   <div class="billing-schedule">
 
     <h1>Billing Accounts</h1>
+
+    <?php if (isset($_GET['archived']) && $_GET['archived'] === '1'): ?>
+      <div class="success" style="display:block;">
+        Billing account archived.
+      </div>
+    <?php endif; ?>
+    
     <div class="table-container">
       <table>
         <thead>
@@ -47,12 +42,10 @@ require '_includes/nav.php';
             <th>Billing Account</th>
             <th>Cadence</th>
             <th>Amount</th>
-            <th>In Reserves</th>
             <th>Next Due Date</th>
             <th>Paid From</th>
             <th>Active</th>
-            <th>Edit</th>
-            <th>Duplicate</th>
+            <th>Manage</th>
           </tr>
         </thead>
         <tbody>
@@ -69,8 +62,6 @@ require '_includes/nav.php';
             <td><?php echo htmlspecialchars((string)$row['cadence'], ENT_QUOTES, 'UTF-8'); ?></td>
 
             <td>$<?php echo number_format((float)$row['default_amount'], 2); ?></td>
-
-            <td>$<?php echo number_format((float)$row['reserve_balance'], 2); ?></td>
 
             <td>
               <?php
@@ -90,10 +81,14 @@ require '_includes/nav.php';
 
             <td>
               <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Edit</a>
-            </td>
-
-            <td>
+              |
+              <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Details</a>
+              |
               <a href="intake_billing-accounts.php?duplicate_billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Duplicate</a>
+              <?php if ((int)$row['is_active'] === 1): ?>
+                |
+                <a href="close_billing-account.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Archive</a>
+              <?php endif; ?>
             </td>
 
             
@@ -106,7 +101,7 @@ require '_includes/nav.php';
 
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
-      <a href="billing_projection.php">Billing Projection</a> |
+      <a href="billing_projection.php">Projection</a> |
       <a href="intake_billing-accounts.php">New Bill</a>
     </div>
 

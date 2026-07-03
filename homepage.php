@@ -25,7 +25,6 @@ $stmt = $pdo_db->prepare("
     ba.cadence,
     ba.reserve_style,
     ba.default_amount,
-    ba.reserve_balance,
     ba.next_due_date,
     ba.actual_due_date,
     ba.renewal_term_months,
@@ -70,52 +69,6 @@ $funding_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 function homepage_base_amount(array $row): float
 {
   return round((float)($row['default_amount'] ?? 0), 2);
-}
-
-function homepage_reserve_totals(array $billing_rows, array $funding_accounts): array
-{
-  $totals = [];
-
-  foreach ($funding_accounts as $account) {
-    $name = trim((string)$account['account_name']);
-    if ($name !== '') {
-      $totals[$name] = 0.00;
-    }
-  }
-
-  foreach ($billing_rows as $row) {
-    $account_name = trim((string)($row['paid_from_account'] ?? ''));
-    if ($account_name === '') {
-      $account_name = 'Unassigned';
-    }
-
-    if (!isset($totals[$account_name])) {
-      $totals[$account_name] = 0.00;
-    }
-
-    $totals[$account_name] += (float)($row['reserve_balance'] ?? 0);
-  }
-
-  foreach ($totals as $account_name => $amount) {
-    $totals[$account_name] = round($amount, 2);
-  }
-
-  ksort($totals, SORT_NATURAL | SORT_FLAG_CASE);
-
-  return $totals;
-}
-
-function homepage_amount_needed(array $row): float
-{
-  $base_amount = homepage_base_amount($row);
-  $reserve_balance = (float)($row['reserve_balance'] ?? 0.00);
-  $remaining = $base_amount - $reserve_balance;
-
-  if ($remaining < 0) {
-    $remaining = 0.00;
-  }
-
-  return round($remaining, 2);
 }
 
 // $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
@@ -206,27 +159,6 @@ $stmt = $pdo_db->prepare("
 ");
 $stmt->execute([$user_id]);
 $recent_account_adjustments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-/*
-  recent reserve activity
-*/
-$stmt = $pdo_db->prepare("
-  SELECT
-    brt.bill_reserve_transaction_id,
-    brt.transaction_type,
-    brt.amount,
-    brt.transaction_date,
-    brt.note,
-    ba.billing_name
-  FROM bill_reserve_transactions brt
-  LEFT JOIN billing_accounts ba
-    ON brt.billing_account_id = ba.billing_account_id
-  WHERE brt.user_id = ?
-  ORDER BY brt.transaction_date DESC, brt.bill_reserve_transaction_id DESC
-  LIMIT 5
-");
-$stmt->execute([$user_id]);
-$recent_reserve_activity = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /*
   recent payments
@@ -348,7 +280,7 @@ require '_includes/nav.php';
     <div class="dashboard-grid lower-grid">
 
       <div class="dashboard-card wide-card">
-        <h2>Next 10</h2>
+        <h2>Next 10 Due</h2>
 
         <?php if ($exceptions): ?>
           <table class="full-width">
@@ -373,19 +305,17 @@ require '_includes/nav.php';
                     </a>
                   </td>
 
+                  <td>
+                    <?php if (!empty($event['default_funding_account_id'])): ?>
+                      <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$event['default_funding_account_id']; ?>">
+                        <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+                      </a>
+                    <?php else: ?>
+                      <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+                    <?php endif; ?>
+                  </td>
 
 
-
-
-<td>
-  <?php if (!empty($event['default_funding_account_id'])): ?>
-    <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$event['default_funding_account_id']; ?>">
-      <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
-    </a>
-  <?php else: ?>
-    <?php echo htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
-  <?php endif; ?>
-</td>
 
 
 
@@ -399,6 +329,15 @@ require '_includes/nav.php';
                       <?php echo date('j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($event['due_date'])); ?>
                     </div>
                   </td>
+
+
+
+
+
+
+
+
+
                   <td><?php echo htmlspecialchars(ucfirst($event['status']), ENT_QUOTES, 'UTF-8'); ?></td>
                   <td>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
                 </tr>
@@ -430,7 +369,7 @@ require '_includes/nav.php';
                   <td>
                     <?php
                     echo !empty($row['event_datetime'])
-                      ? date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']))
+                      ? date("m.d.y", strtotime($row['event_datetime']))
                       : '';
                     ?>
                   </td>
@@ -439,22 +378,20 @@ require '_includes/nav.php';
                       <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                   </td>
-                  <td>
-                    <?php
-                    if ($row['event_source'] === 'bill_payment') {
-                      echo 'payment';
-                    } else {
-                      echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8');
-                    }
-                    ?>
-                  </td>
+                  <td><?php echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8'); ?></td>
                   <td>
                     <?php
                     $sign = ((float)$row['signed_amount'] < 0) ? '-' : '+';
                     echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2);
                     ?>
                   </td>
-                  <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  <td>
+                    <?php if (htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8') === "Auto-deducted from reserve") {
+                      echo 'Auto-deducted from funding account pool';
+                    } else {
+                      echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8');
+                    } ?>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -483,9 +420,14 @@ require '_includes/nav.php';
                 <tr>
                   <td>
                     <?php
-                    echo !empty($row['transaction_date'])
-                      ? date("D, m/d \\a\\t H:i", strtotime($row['transaction_date']))
-                      : '';
+                    $haystack = htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8');
+                    $needle = "Automatic draft deduction";
+
+                    if (!empty($row['transaction_date']) && !str_contains($haystack, $needle)) {
+                      echo date("m.d.y \\a\\t H:i", strtotime($row['transaction_date']));
+                    } else {
+                      echo date("m.d.y", strtotime($row['transaction_date']));
+                    }
                     ?>
                   </td>
                   <td><?php echo htmlspecialchars((string)$row['account_name'], ENT_QUOTES, 'UTF-8'); ?></td>

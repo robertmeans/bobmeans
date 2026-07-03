@@ -1,38 +1,5 @@
 <?php
 
-function count_prepaid_monthly_cycles(string $next_due_date, DateTime $today): int
-{
-  if ($next_due_date === '') {
-    return 0;
-  }
-
-  try {
-    $next_due = new DateTime($next_due_date);
-    $next_due->setTime(0, 0, 0);
-  } catch (Exception $e) {
-    return 0;
-  }
-
-  if ($next_due <= $today) {
-    return 0;
-  }
-
-  $count = 0;
-  $cursor = clone $next_due;
-
-  while (true) {
-    $cursor->modify('-1 month');
-
-    if ($cursor > $today) {
-      $count++;
-    } else {
-      break;
-    }
-  }
-
-  return $count;
-}
-
 function annual_prepaid_rebuild_amount(
   float $annual_cost,
   ?string $last_paid_date,
@@ -79,35 +46,6 @@ function annual_prepaid_rebuild_amount(
   return round($reserve, 2);
 }
 
-// function paypal_reserved_amount_for_bill(array $row, DateTime $today): float
-// {
-//   $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-//   if ($paid_from !== 'paypal') {
-//     return 0.00;
-//   }
-
-//   $cadence = (string)($row['cadence'] ?? '');
-//   $reserve_style = (string)($row['reserve_style'] ?? 'sinking_fund');
-//   $default_amount = (float)($row['default_amount'] ?? 0);
-//   $next_due_date = (string)($row['next_due_date'] ?? '');
-//   $reserve_amount = isset($row['reserve_amount']) ? (float)$row['reserve_amount'] : 0.00;
-
-//   if ($reserve_style === 'manual_reserve') {
-//     return round($reserve_amount, 2);
-//   }
-
-//   if ($cadence === 'monthly' && $reserve_style === 'sinking_fund') {
-//     $cycles = count_prepaid_monthly_cycles($next_due_date, $today);
-//     return round($default_amount * $cycles, 2);
-//   }
-
-//   if ($cadence === 'annual' && $reserve_style === 'prepaid') {
-//     return 0.00;
-//   }
-
-//   return 0.00;
-// }
-
 function payment_amount_for_bill(array $bill, int $cycles_paid = 1): float
 {
   $cadence = (string)($bill['cadence'] ?? '');
@@ -136,7 +74,6 @@ function load_billing_account(PDO $pdo_db, int $user_id, int $billing_account_id
       ba.reserve_style,
       ba.default_amount,
       ba.annual_cost,
-      ba.next_due_date,
       ba.paid_through_date,
       ba.last_paid_date,
       ba.renewal_term_months,
@@ -162,20 +99,6 @@ function load_billing_account(PDO $pdo_db, int $user_id, int $billing_account_id
   return $row ?: null;
 }
 
-function amount_due_after_reserve(array $row): float
-{
-  $base_amount = base_amount_for_bill($row);
-  $reserve_balance = isset($row['reserve_balance']) ? (float)$row['reserve_balance'] : 0.00;
-
-  $remaining = $base_amount - $reserve_balance;
-
-  if ($remaining < 0) {
-    $remaining = 0.00;
-  }
-
-  return round($remaining, 2);
-}
-
 function load_billing_account_contribute(PDO $pdo_db, int $user_id, int $billing_account_id): ?array
 {
   $stmt = $pdo_db->prepare("
@@ -186,8 +109,6 @@ function load_billing_account_contribute(PDO $pdo_db, int $user_id, int $billing
       cadence,
       default_amount,
       annual_cost,
-      reserve_balance,
-      next_due_date,
       default_funding_account_id
     FROM billing_accounts
     WHERE user_id = ?
@@ -198,38 +119,6 @@ function load_billing_account_contribute(PDO $pdo_db, int $user_id, int $billing
   $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
   return $row ?: null;
-}
-
-function load_due_autopay_bills(PDO $pdo_db, int $user_id, string $today): array
-{
-  $stmt = $pdo_db->prepare("
-    SELECT
-      ba.billing_account_id,
-      ba.user_id,
-      ba.billing_name,
-      ba.cadence,
-      ba.reserve_style,
-      ba.default_amount,
-      ba.annual_cost,
-      ba.reserve_balance,
-      ba.next_due_date,
-      ba.paid_through_date,
-      ba.last_paid_date,
-      ba.renewal_term_months,
-      ba.default_funding_account_id,
-      ba.transfer_from_funding_account_id,
-      ba.is_autopay,
-      ba.auto_advance_on_payment,
-      ba.is_active
-    FROM billing_accounts ba
-    WHERE ba.user_id = ?
-      AND ba.is_active = 1
-      AND ba.is_autopay = 1
-      AND ba.next_due_date <= ?
-    ORDER BY ba.next_due_date ASC, ba.billing_account_id ASC
-  ");
-  $stmt->execute([$user_id, $today]);
-  return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function autopay_already_processed(PDO $pdo_db, int $billing_account_id, string $due_date): bool
@@ -245,144 +134,6 @@ function autopay_already_processed(PDO $pdo_db, int $billing_account_id, string 
   $stmt->execute([$billing_account_id, $due_date]);
 
   return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-function process_single_autopay_bill(PDO $pdo_db, array $bill, string $today): bool
-{
-  $amount_due = payment_amount_for_bill($bill, 1);
-  $reserve_balance = (float)($bill['reserve_balance'] ?? 0.00);
-  $billing_account_id = (int)$bill['billing_account_id'];
-  $user_id = (int)$bill['user_id'];
-  $due_date = (string)$bill['next_due_date'];
-
-  if ($amount_due <= 0) {
-    return false;
-  }
-
-  if ($reserve_balance < $amount_due) {
-    return false;
-  }
-
-  if (autopay_already_processed($pdo_db, $billing_account_id, $due_date)) {
-    return false;
-  }
-
-  $new_reserve_balance = round($reserve_balance - $amount_due, 2);
-  if ($new_reserve_balance < 0) {
-    $new_reserve_balance = 0.00;
-  }
-
-  $months_to_advance = months_to_advance_for_bill($bill, 1);
-  $new_next_due_date = add_months_to_date($due_date, $months_to_advance);
-
-  $pdo_db->beginTransaction();
-
-  try {
-    $stmt = $pdo_db->prepare("
-      INSERT INTO bill_payments (
-        billing_account_id,
-        user_id,
-        due_date,
-        amount_due,
-        amount_paid,
-        date_paid,
-        funding_account_id,
-        transfer_from_funding_account_id,
-        status,
-        confirmation_note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-
-    $stmt->execute([
-      $billing_account_id,
-      $user_id,
-      $due_date,
-      $amount_due,
-      $amount_due,
-      $today,
-      $bill['default_funding_account_id'] !== null ? (int)$bill['default_funding_account_id'] : null,
-      $bill['transfer_from_funding_account_id'] !== null ? (int)$bill['transfer_from_funding_account_id'] : null,
-      'paid',
-      'Auto-processed on due date'
-    ]);
-
-    $stmt = $pdo_db->prepare("
-      UPDATE billing_accounts
-      SET
-        reserve_balance = ?,
-        next_due_date = ?,
-        paid_through_date = ?,
-        last_paid_date = ?,
-        updated_at = NOW()
-      WHERE billing_account_id = ?
-        AND user_id = ?
-      LIMIT 1
-    ");
-
-    $stmt->execute([
-      $new_reserve_balance,
-      $new_next_due_date,
-      $new_next_due_date,
-      $today,
-      $billing_account_id,
-      $user_id
-    ]);
-
-    $pdo_db->commit();
-    return true;
-  } catch (Exception $e) {
-    if ($pdo_db->inTransaction()) {
-      $pdo_db->rollBack();
-    }
-
-    error_log('Autopay processing failed for billing_account_id ' . $billing_account_id . ': ' . $e->getMessage());
-    return false;
-  }
-}
-
-function process_due_autopay_bills(PDO $pdo_db, int $user_id): array
-{
-  $today = date('Y-m-d');
-  $due_bills = load_due_autopay_bills($pdo_db, $user_id, $today);
-
-  $processed_count = 0;
-  $skipped_count = 0;
-
-  foreach ($due_bills as $bill) {
-    $processed = process_single_autopay_bill($pdo_db, $bill, $today);
-
-    if ($processed) {
-      $processed_count++;
-    } else {
-      $skipped_count++;
-    }
-  }
-
-  return [
-    'processed_count' => $processed_count,
-    'skipped_count' => $skipped_count
-  ];
-}
-
-function advance_next_due_date_by_cycles(array $bill, string $next_due_date, int $cycles): string
-{
-  if ($cycles < 1) {
-    return $next_due_date;
-  }
-
-  $months_to_advance = months_to_advance_for_bill($bill, $cycles);
-  return add_months_to_date($next_due_date, $months_to_advance);
-}
-
-function covered_cycles_from_reserve(array $bill, float $reserve_balance): int
-{
-  $base_amount = base_amount_for_bill($bill);
-
-  if ($base_amount <= 0) {
-    return 0;
-  }
-
-  return (int)floor($reserve_balance / $base_amount);
 }
 
 function add_months_to_date(string $date_string, int $months): string
@@ -406,44 +157,9 @@ function months_to_advance_for_bill(array $bill, int $cycles = 1): int
   return $renewal_term_months * $cycles;
 }
 
-function projected_actual_due_date(array $bill): string
-{
-  $next_due_date = (string)($bill['next_due_date'] ?? '');
-
-  if ($next_due_date === '') {
-    return '';
-  }
-
-  $reserve_balance = isset($bill['reserve_balance']) ? (float)$bill['reserve_balance'] : 0.00;
-  $covered_cycles = covered_cycles_from_reserve($bill, $reserve_balance);
-
-  if ($covered_cycles < 1) {
-    return $next_due_date;
-  }
-
-  $months_back = months_to_advance_for_bill($bill, $covered_cycles);
-
-  return add_months_to_date($next_due_date, -$months_back);
-}
-
 function base_amount_for_bill(array $bill): float
 {
   return round((float)($bill['default_amount'] ?? 0), 2);
-}
-
-function pooled_paypal_balance(array $rows): float
-{
-  $total = 0.00;
-
-  foreach ($rows as $row) {
-    $paid_from = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-
-    if ($paid_from === 'paypal') {
-      $total += (float)($row['reserve_balance'] ?? 0);
-    }
-  }
-
-  return round($total, 2);
 }
 
 function safe_day_for_month(int $year, int $month, int $day): int
@@ -828,50 +544,6 @@ function reconcile_due_bills_against_reserves(PDO $pdo_db, int $user_id): array
   ];
 }
 
-function reserve_totals_by_funding_account(array $rows): array
-{
-  $totals = [];
-
-  foreach ($rows as $row) {
-    $account_name = trim((string)($row['paid_from_account'] ?? ''));
-    $reserve_balance = isset($row['reserve_balance']) ? (float)$row['reserve_balance'] : 0.00;
-
-    if ($account_name === '') {
-      $account_name = 'Unassigned';
-    }
-
-    if (!isset($totals[$account_name])) {
-      $totals[$account_name] = 0.00;
-    }
-
-    $totals[$account_name] += $reserve_balance;
-  }
-
-  foreach ($totals as $account_name => $amount) {
-    $totals[$account_name] = round($amount, 2);
-  }
-
-  ksort($totals, SORT_NATURAL | SORT_FLAG_CASE);
-
-  return $totals;
-}
-
-function reserve_total_for_funding_account(array $rows, string $target_account_name): float
-{
-  $total = 0.00;
-  $target = strtolower(trim($target_account_name));
-
-  foreach ($rows as $row) {
-    $account_name = strtolower(trim((string)($row['paid_from_account'] ?? '')));
-
-    if ($account_name === $target) {
-      $total += (float)($row['reserve_balance'] ?? 0);
-    }
-  }
-
-  return round($total, 2);
-}
-
 function filter_rows_by_funding_account(array $rows, string $target_account_name): array
 {
   $filtered = [];
@@ -928,65 +600,6 @@ function funding_account_general_reserve_totals(PDO $pdo_db, int $user_id): arra
   }
 
   return $totals;
-}
-
-function bill_reserve_totals_by_funding_account(array $rows): array
-{
-  $totals = [];
-
-  foreach ($rows as $row) {
-    $account_name = trim((string)($row['paid_from_account'] ?? ''));
-
-    if ($account_name === '') {
-      $account_name = 'Unassigned';
-    }
-
-    if (!isset($totals[$account_name])) {
-      $totals[$account_name] = 0.00;
-    }
-
-    $totals[$account_name] += (float)($row['reserve_balance'] ?? 0);
-  }
-
-  foreach ($totals as $account_name => $amount) {
-    $totals[$account_name] = round($amount, 2);
-  }
-
-  return $totals;
-}
-
-function combined_reserve_totals_by_funding_account(PDO $pdo_db, int $user_id, array $billing_rows): array
-{
-  $bill_totals = bill_reserve_totals_by_funding_account($billing_rows);
-  $general_totals = funding_account_general_reserve_totals($pdo_db, $user_id);
-
-  $combined = [];
-
-  foreach ($general_totals as $account_name => $amount) {
-    $combined[$account_name] = $amount;
-  }
-
-  foreach ($bill_totals as $account_name => $amount) {
-    if (!isset($combined[$account_name])) {
-      $combined[$account_name] = 0.00;
-    }
-
-    $combined[$account_name] += $amount;
-  }
-
-  foreach ($combined as $account_name => $amount) {
-    $combined[$account_name] = round($amount, 2);
-  }
-
-  ksort($combined, SORT_NATURAL | SORT_FLAG_CASE);
-
-  return $combined;
-}
-
-function combined_reserve_total_for_funding_account(PDO $pdo_db, int $user_id, array $billing_rows, string $target_account_name): float
-{
-  $totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
-  return isset($totals[$target_account_name]) ? round((float)$totals[$target_account_name], 2) : 0.00;
 }
 
 function funding_account_selector_options(PDO $pdo_db, int $user_id): array
@@ -1480,84 +1093,28 @@ function funding_account_pool_totals(PDO $pdo_db, int $user_id): array
 
 function recent_bill_activity(PDO $pdo_db, int $user_id, int $limit = 5): array
 {
-  $activity = [];
-
-  /*
-    bill reserve transactions
-  */
-  $stmt = $pdo_db->prepare("
-    SELECT
-      brt.transaction_date AS event_datetime,
-      'bill_reserve' AS event_source,
-      brt.transaction_type AS event_type,
-      ba.billing_account_id,
-      ba.billing_name,
-      brt.amount,
-      brt.note
-    FROM bill_reserve_transactions brt
-    INNER JOIN billing_accounts ba
-      ON brt.billing_account_id = ba.billing_account_id
-    WHERE brt.user_id = ?
-  ");
-  $stmt->execute([$user_id]);
-  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-  foreach ($rows as $row) {
-    $activity[] = [
-      'event_datetime' => $row['event_datetime'],
-      'event_source' => $row['event_source'],
-      'event_type' => $row['event_type'],
-      'billing_account_id' => $row['billing_account_id'],
-      'billing_name' => $row['billing_name'],
-      'signed_amount' => ((string)$row['event_type'] === 'deduction')
-        ? -(float)$row['amount']
-        : (float)$row['amount'],
-      'note' => $row['note']
-    ];
-  }
-
-  /*
-    bill payments
-  */
   $stmt = $pdo_db->prepare("
     SELECT
       CONCAT(bp.date_paid, ' 00:00:00') AS event_datetime,
       'bill_payment' AS event_source,
-      'paid' AS event_type,
+      'payment' AS event_type,
       ba.billing_account_id,
       ba.billing_name,
-      bp.amount_paid AS amount,
+      -bp.amount_paid AS signed_amount,
       bp.confirmation_note AS note
     FROM bill_payments bp
     INNER JOIN billing_accounts ba
       ON bp.billing_account_id = ba.billing_account_id
     WHERE bp.user_id = ?
       AND bp.status = 'paid'
+    ORDER BY bp.date_paid DESC, bp.bill_payment_id DESC
+    LIMIT ?
   ");
-  $stmt->execute([$user_id]);
-  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  $stmt->bindValue(1, $user_id, PDO::PARAM_INT);
+  $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+  $stmt->execute();
 
-  foreach ($rows as $row) {
-    $activity[] = [
-      'event_datetime' => $row['event_datetime'],
-      'event_source' => $row['event_source'],
-      'event_type' => $row['event_type'],
-      'billing_account_id' => $row['billing_account_id'],
-      'billing_name' => $row['billing_name'],
-      'signed_amount' => -(float)$row['amount'],
-      'note' => $row['note']
-    ];
-  }
-
-  usort($activity, function ($a, $b) {
-    if ($a['event_datetime'] === $b['event_datetime']) {
-      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
-    }
-
-    return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
-  });
-
-  return array_slice($activity, 0, $limit);
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 function funding_account_pool_balance_by_id(PDO $pdo_db, int $user_id, int $funding_account_id): float
@@ -1578,4 +1135,260 @@ function funding_account_pool_balance_by_id(PDO $pdo_db, int $user_id, int $fund
   $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
   return round((float)($row['balance'] ?? 0), 2);
+}
+
+function next_attention_date_for_bill(
+  PDO $pdo_db,
+  int $user_id,
+  int $billing_account_id,
+  int $funding_account_id,
+  int $months_ahead = 24
+): ?array {
+  $stmt = $pdo_db->prepare("
+    SELECT
+      ba.billing_account_id,
+      ba.user_id,
+      ba.billing_name,
+      ba.vendor_name,
+      ba.cadence,
+      ba.reserve_style,
+      ba.default_amount,
+      ba.actual_due_date,
+      ba.renewal_term_months,
+      ba.due_day_of_month,
+      ba.due_month_of_year,
+      ba.default_funding_account_id,
+      ba.transfer_from_funding_account_id,
+      ba.is_active,
+      fa.account_name AS paid_from_account
+    FROM billing_accounts ba
+    LEFT JOIN funding_accounts fa
+      ON ba.default_funding_account_id = fa.funding_account_id
+    WHERE ba.user_id = ?
+      AND ba.is_active = 1
+      AND ba.default_funding_account_id = ?
+    ORDER BY ba.billing_name ASC
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $rows_for_account = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  if (!$rows_for_account) {
+    return null;
+  }
+
+  $pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+
+  $events = generate_projected_bill_events($rows_for_account, $months_ahead);
+  $projection = apply_pool_to_projected_events($events, $pool_balance);
+
+  foreach ($projection['events'] as $event) {
+    if (
+      (int)$event['billing_account_id'] === $billing_account_id &&
+      ($event['status'] === 'partial' || $event['status'] === 'due')
+    ) {
+      return [
+        'due_date' => $event['due_date'],
+        'status' => $event['status'],
+        'remaining_due' => (float)$event['remaining_due']
+      ];
+    }
+  }
+
+  return null;
+}
+
+function funding_account_archive_status(PDO $pdo_db, int $user_id, int $funding_account_id): array
+{
+  $status = [
+    'funding_account_id' => $funding_account_id,
+    'can_archive' => false,
+    'is_already_inactive' => false,
+    'current_balance' => 0.00,
+    'active_bill_count' => 0,
+    'active_bills' => [],
+    'has_history' => false,
+    'blocking_reasons' => []
+  ];
+
+  $stmt = $pdo_db->prepare("
+    SELECT funding_account_id, account_name, is_active
+    FROM funding_accounts
+    WHERE funding_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$funding_account_id, $user_id]);
+  $account = $stmt->fetch(PDO::FETCH_ASSOC);
+
+  if (!$account) {
+    $status['blocking_reasons'][] = 'Funding account not found.';
+    return $status;
+  }
+
+  $status['is_already_inactive'] = ((int)$account['is_active'] !== 1);
+
+  $status['current_balance'] = funding_account_current_balance_from_ledger($pdo_db, $user_id, $funding_account_id);
+
+  $stmt = $pdo_db->prepare("
+    SELECT billing_account_id, billing_name, actual_due_date
+    FROM billing_accounts
+    WHERE user_id = ?
+      AND default_funding_account_id = ?
+      AND is_active = 1
+    ORDER BY billing_name ASC
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $active_bills = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  $status['active_bills'] = $active_bills;
+  $status['active_bill_count'] = count($active_bills);
+
+  $stmt = $pdo_db->prepare("
+    SELECT 1
+    FROM funding_account_reserve_transactions
+    WHERE user_id = ?
+      AND funding_account_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $has_funding_history = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+
+  $stmt = $pdo_db->prepare("
+    SELECT 1
+    FROM bill_payments
+    WHERE user_id = ?
+      AND funding_account_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$user_id, $funding_account_id]);
+  $has_payment_history = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+
+  $status['has_history'] = ($has_funding_history || $has_payment_history);
+
+  if ($status['is_already_inactive']) {
+    $status['blocking_reasons'][] = 'This funding account is already inactive.';
+  }
+
+  if (abs($status['current_balance']) > 0.009) {
+    $status['blocking_reasons'][] = 'Current balance must be zero before archiving.';
+  }
+
+  if ($status['active_bill_count'] > 0) {
+    $status['blocking_reasons'][] = 'Active bills are still assigned to this funding account.';
+  }
+
+  $status['can_archive'] = empty($status['blocking_reasons']);
+
+  return $status;
+}
+
+function archive_funding_account(PDO $pdo_db, int $user_id, int $funding_account_id, ?string $closure_note = null): bool
+{
+  $status = funding_account_archive_status($pdo_db, $user_id, $funding_account_id);
+
+  if (!$status['can_archive']) {
+    return false;
+  }
+
+  $stmt = $pdo_db->prepare("
+    UPDATE funding_accounts
+    SET
+      is_active = 0,
+      closed_at = NOW(),
+      closure_note = ?,
+      updated_at = NOW()
+    WHERE funding_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+
+  return $stmt->execute([
+    ($closure_note !== null && trim($closure_note) !== '') ? trim($closure_note) : null,
+    $funding_account_id,
+    $user_id
+  ]);
+}
+
+function billing_account_archive_status(PDO $pdo_db, int $user_id, int $billing_account_id): array
+{
+  $status = [
+    'billing_account_id' => $billing_account_id,
+    'can_archive' => false,
+    'is_already_inactive' => false,
+    'has_payment_history' => false,
+    'has_notes' => false,
+    'blocking_reasons' => []
+  ];
+
+  $stmt = $pdo_db->prepare("
+    SELECT billing_account_id, billing_name, is_active
+    FROM billing_accounts
+    WHERE billing_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$billing_account_id, $user_id]);
+  $bill = $stmt->fetch(PDO::FETCH_ASSOC);
+
+  if (!$bill) {
+    $status['blocking_reasons'][] = 'Billing account not found.';
+    return $status;
+  }
+
+  $status['is_already_inactive'] = ((int)$bill['is_active'] !== 1);
+
+  $stmt = $pdo_db->prepare("
+    SELECT 1
+    FROM bill_payments
+    WHERE billing_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$billing_account_id, $user_id]);
+  $status['has_payment_history'] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+
+  $stmt = $pdo_db->prepare("
+    SELECT 1
+    FROM bill_notes
+    WHERE billing_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+  $stmt->execute([$billing_account_id, $user_id]);
+  $status['has_notes'] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+
+  if ($status['is_already_inactive']) {
+    $status['blocking_reasons'][] = 'This billing account is already inactive.';
+  }
+
+  $status['can_archive'] = empty($status['blocking_reasons']);
+
+  return $status;
+}
+
+function archive_billing_account(PDO $pdo_db, int $user_id, int $billing_account_id, ?string $closure_note = null): bool
+{
+  $status = billing_account_archive_status($pdo_db, $user_id, $billing_account_id);
+
+  if (!$status['can_archive']) {
+    return false;
+  }
+
+  $stmt = $pdo_db->prepare("
+    UPDATE billing_accounts
+    SET
+      is_active = 0,
+      closed_at = NOW(),
+      closure_note = ?,
+      updated_at = NOW()
+    WHERE billing_account_id = ?
+      AND user_id = ?
+    LIMIT 1
+  ");
+
+  return $stmt->execute([
+    ($closure_note !== null && trim($closure_note) !== '') ? trim($closure_note) : null,
+    $billing_account_id,
+    $user_id
+  ]);
 }

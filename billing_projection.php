@@ -20,7 +20,6 @@ $stmt = $pdo_db->prepare("
     ba.cadence,
     ba.reserve_style,
     ba.default_amount,
-    -- ba.reserve_balance,
     ba.next_due_date,
     ba.actual_due_date,
     ba.renewal_term_months,
@@ -65,15 +64,18 @@ require '_includes/nav.php';
 
 
     <?php 
+    /*  $single_fund_acct = determine whether there is more than 1 funding account
+        in order to present accordingly (e.g., dropdown or no dropdown,
+        the need for the word "selected" or not, etc.) */
     if (count($reserve_totals) === 1) { 
-      $skip = 'yes'; 
+      $single_fund_acct = 'yes'; 
     } else { 
-      $skip = 'no'; 
+      $single_fund_acct = 'no'; 
     } ?>
 
-    <?php if ($skip !== 'yes') { ?>
+    <?php if ($single_fund_acct !== 'yes') { ?>
       <form class="pro-acct" method="get" style="margin-bottom: 1em;">
-        <label for="account"><strong>Projection Account:</strong></label>
+        <label for="account"><strong>Switch Projection Account:</strong></label>
         <select id="account" name="account" onchange="this.form.submit()">
           <?php foreach ($reserve_totals as $account_name => $amount): ?>
             <option value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>" <?php echo ($selected_account === $account_name) ? 'selected' : ''; ?>>
@@ -98,29 +100,49 @@ require '_includes/nav.php';
 */ ?>
 
 
+      <div>
 
-      <div class="paypal-running-balance">
-        <?php if ($skip !== 'yes') { ?>
+        <?php if ($single_fund_acct !== 'yes') { ?>
+
         <?php foreach ($reserve_totals as $account_name => $amount): ?>
-          <div>
-            <strong>
-              <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
-              <?php if ($skip !== 'yes') { echo ($selected_account === $account_name) ? ' (selected)' : ''; } ?>:
-            </strong>
-            $<?php echo number_format($amount, 2); ?>
-          </div>
+          
+            <?php if ($selected_account === $account_name) { ?>
+              <div class="selected-fund">
+                <i class="fas fa-star"></i>&nbsp; [selected]
+                <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> 
+                $<?php echo number_format($amount, 2); ?>
+                &nbsp;<i class="fas fa-star"></i>
+              </div>
+            <?php } else { ?>
+              <div>
+                <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> 
+                $<?php echo number_format($amount, 2); ?>
+              </div>
+           <?php } ?>
+
+  
         <?php endforeach; ?>
+
+        <?php } else { ?>
+
+              <div>
+                You only have 1 funding account.
+              </div>
+
         <?php } ?>
 
+
+
         <div style="display: flex;margin: 0.5em 0 0.5em;">
-          <?php if ($selected_account === 'PayPal') { ?>
-          <a href="https://paypal.com" target="_blank"><img class="paypal-icon bnav" src="_images/paypal.webp"></a>
-        <?php } else {
-          echo '<strong>' . htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8');
-        } ?> Reserve Used In Projection:</strong>
-          $<?php echo number_format($projection['starting_pool'], 2); ?>
+          <strong><?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?> Reserve Used In Projection:</strong>&nbsp; $<?php echo number_format($projection['starting_pool'], 2); ?>
         </div>
+
+
+
       </div>
+
+
+
     <div class="table-container">
     <table>
       <thead>
@@ -213,7 +235,8 @@ require '_includes/nav.php';
 
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
-      <a href="reserve_adjustment.php">Reserve Adjustment</a>
+      <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
+      <a href="intake_funding-accounts.php">Add New Funding</a>
     </div>
 
   </div>

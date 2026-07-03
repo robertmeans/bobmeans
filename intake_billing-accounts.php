@@ -9,7 +9,6 @@ $layout_context = 'intakeBilling';
 $errors = [];
 
 $billing_name = '';
-$reserve_balance = '0.00';
 $vendor_name = '';
 $cadence = 'monthly';
 $reserve_style = 'sinking_fund';
@@ -61,7 +60,6 @@ if (
     $cadence = (string)($duplicate_bill['cadence'] ?? 'monthly');
     $reserve_style = (string)($duplicate_bill['reserve_style'] ?? 'sinking_fund');
     $default_amount = isset($duplicate_bill['default_amount']) ? (string)$duplicate_bill['default_amount'] : '';
-    $reserve_balance = isset($duplicate_bill['reserve_balance']) ? (string)$duplicate_bill['reserve_balance'] : '0.00';
     $next_due_date = (string)($duplicate_bill['next_due_date'] ?? '');
     $actual_due_date = (string)($duplicate_bill['actual_due_date'] ?? '');
     $renewal_term_months = isset($duplicate_bill['renewal_term_months']) ? (string)$duplicate_bill['renewal_term_months'] : '1';
@@ -90,18 +88,14 @@ $funding_accounts = $stmt->fetchAll();
 /* handle form submit */
 if (is_post_request() && isset($_POST['create_billing_account'])) {
   $billing_name = trim($_POST['billing_name'] ?? '');
-  $reserve_balance = trim($_POST['reserve_balance'] ?? '0.00');
   $vendor_name = trim($_POST['vendor_name'] ?? '');
   $cadence = trim($_POST['cadence'] ?? 'monthly');
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
-  // $annual_cost = trim($_POST['annual_cost'] ?? '');
   $due_day_of_month = trim($_POST['due_day_of_month'] ?? '');
   $due_month_of_year = trim($_POST['due_month_of_year'] ?? '');
   $next_due_date = trim($_POST['next_due_date'] ?? '');
   $actual_due_date = trim($_POST['actual_due_date'] ?? '');
-  // $paid_through_date = trim($_POST['paid_through_date'] ?? '');
-  // $last_paid_date = trim($_POST['last_paid_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '12');
   $default_funding_account_id = trim($_POST['default_funding_account_id'] ?? '');
   $transfer_from_funding_account_id = trim($_POST['transfer_from_funding_account_id'] ?? '');
@@ -113,10 +107,6 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
 
   if ($billing_name === '') {
     $errors[] = 'Billing account name is required.';
-  }
-
-  if ($reserve_balance === '' || !is_numeric($reserve_balance)) {
-    $errors[] = 'Reserve balance must be numeric.';
   }
 
   if (!in_array($cadence, ['monthly', 'annual', 'custom'], true)) {
@@ -131,22 +121,9 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $errors[] = 'Amount due is required and must be numeric.';
   }
 
-  // if ($annual_cost !== '' && !is_numeric($annual_cost)) {
-  //   $errors[] = 'Annual cost must be numeric if provided.';
-  // }
-
   if ($due_day_of_month === '' || !ctype_digit((string)$due_day_of_month) || (int)$due_day_of_month < 1 || (int)$due_day_of_month > 31) {
     $errors[] = 'Due day of month must be between 1 and 31.';
   }
-
-
-  // if ($cadence === 'annual') {
-  //   if ($due_month_of_year === '' || !ctype_digit((string)$due_month_of_year) || (int)$due_month_of_year < 1 || (int)$due_month_of_year > 12) {
-  //     $errors[] = 'Due month of year must be between 1 and 12 for annual bills.';
-  //   }
-  // } else {
-  //   $due_month_of_year = null;
-  // }
 
   if ($cadence === 'annual' || $cadence === 'custom') {
     if (
@@ -161,26 +138,17 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $due_month_of_year = null;
   }
 
+  // if ($next_due_date === '') {
+  //   $errors[] = 'Next due date is required.';
+  // }
 
-  if ($next_due_date === '') {
-    $errors[] = 'Next due date is required.';
-  }
-
-  if ($next_due_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
-    $errors[] = 'Next due date must be in YYYY-MM-DD format.';
-  }
+  // if ($next_due_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
+  //   $errors[] = 'Next due date must be in YYYY-MM-DD format.';
+  // }
 
   if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
     $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
   }
-
-  // if ($paid_through_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $paid_through_date)) {
-  //   $errors[] = 'Paid through date must be in YYYY-MM-DD format.';
-  // }
-
-  // if ($last_paid_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $last_paid_date)) {
-  //   $errors[] = 'Last paid date must be in YYYY-MM-DD format.';
-  // }
 
   if ($renewal_term_months === '' || !ctype_digit((string)$renewal_term_months) || (int)$renewal_term_months < 1) {
     $errors[] = 'Renewal term must be a whole number greater than 0.';
@@ -190,14 +158,10 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $errors[] = 'Sort order must be a whole number.';
   }
 
-  $reserve_balance = ($reserve_balance === '') ? '0.00' : $reserve_balance;
   $default_funding_account_id = ($default_funding_account_id === '') ? null : (int)$default_funding_account_id;
   $transfer_from_funding_account_id = ($transfer_from_funding_account_id === '') ? null : (int)$transfer_from_funding_account_id;
-  // $annual_cost = ($annual_cost === '') ? null : $annual_cost;
   $due_day_of_month = (int)$due_day_of_month;
   $due_month_of_year = ($due_month_of_year === null || $due_month_of_year === '') ? null : (int)$due_month_of_year;
-  // $paid_through_date = ($paid_through_date === '') ? null : $paid_through_date;
-  // $last_paid_date = ($last_paid_date === '') ? null : $last_paid_date;
   $renewal_term_months = (int)$renewal_term_months;
   $sort_order = ($sort_order === '') ? 0 : (int)$sort_order;
 
@@ -226,7 +190,6 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
         cadence,
         reserve_style,
         default_amount,
-        reserve_balance,
         next_due_date,
         actual_due_date,
         renewal_term_months,
@@ -238,7 +201,7 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
         auto_advance_on_payment,
         is_active,
         sort_order
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     $stmt->execute([
@@ -249,7 +212,6 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       $cadence,
       $reserve_style,
       $default_amount,
-      $reserve_balance,
       $next_due_date,
       $actual_due_date,
       $renewal_term_months,
@@ -364,19 +326,12 @@ require '_includes/nav.php';
         </div>
 
         <div class="two-col">
-          <div class="row">
-            <label for="next_due_date">Next Due Date</label>
-            <input
-              type="date"
-              id="next_due_date"
-              name="next_due_date"
-              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-              required
-            >
-          </div>
 
           <div class="row">
-            <label for="actual_due_date">Actual Due Date</label>
+            <?php /* Previously 'Actual Due Date' - renamed for clarity.
+            <label for="actual_due_date">Actual Due Date</label> 
+            */ ?>
+             <label for="actual_due_date">Next Calendar Due Date</label>
             <input
               type="date"
               id="actual_due_date"
@@ -385,6 +340,22 @@ require '_includes/nav.php';
               required
             >
           </div>
+
+          <div class="row">
+            <?php /* 
+            <label for="next_due_date">Next Due Date</label>
+            <input
+              type="date"
+              id="next_due_date"
+              name="next_due_date"
+              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
+              required
+            >
+            */ ?>
+            &nbsp;
+          </div>
+
+
         </div>
 
         <div class="two-col">
@@ -427,17 +398,6 @@ require '_includes/nav.php';
             >
           </div>
 
-          <div class="row">
-            <label for="reserve_balance">In Reserves</label>
-            <input
-              type="number"
-              step="0.01"
-              id="reserve_balance"
-              name="reserve_balance"
-              value="<?php echo htmlspecialchars($reserve_balance, ENT_QUOTES, 'UTF-8'); ?>"
-              required
-            >
-          </div>
         </div>
 
         <div class="two-col">

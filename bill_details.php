@@ -44,9 +44,6 @@ if ($billing_account_id < 1) {
   }
 }
 
-
-
-
 if (is_post_request() && isset($_POST['add_bill_note']) && $bill) {
   $new_note_body = trim($_POST['note_body'] ?? '');
 
@@ -74,9 +71,6 @@ if (is_post_request() && isset($_POST['add_bill_note']) && $bill) {
     exit();
   }
 }
-
-
-
 
 if ($bill) {
 
@@ -112,6 +106,18 @@ if ($bill) {
   $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+$next_attention = null;
+
+if (!empty($bill['default_funding_account_id'])) {
+  $next_attention = next_attention_date_for_bill(
+    $pdo_db,
+    $user_id,
+    (int)$bill['billing_account_id'],
+    (int)$bill['default_funding_account_id'],
+    24
+  );
+}
+
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -136,98 +142,51 @@ require '_includes/nav.php';
 
       <div class="success" style="display:block;">
 
-
-
         <strong><?= $bill_acct_name; ?></strong> <a href="edit_billing-account.php?billing_account_id=<?php echo $bill['billing_account_id']; ?>"><i class="fas fa-edit"></i></a><br>
-
-
 
         <?php if (!empty($bill['vendor_name'])): ?>
           Vendor: <?php echo htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); ?><br>
         <?php endif; ?>
         Base Amount: $<?php echo number_format((float)$bill['default_amount'], 2); ?><br>
-        
-        <?php /*
-        In Reserves: $<?php echo number_format((float)$bill['reserve_balance'], 2); ?><br>
-        */ ?>
 
+
+<?php /*
         Next Due Date: 
-        <?php echo date("m.d.y", strtotime($bill['next_due_date']));?><br>
+        <?php if (date('y') === date('y', strtotime($bill['next_due_date']))) {
+          echo date("F j\<\s\u\p\>S\<\/\s\u\p\>", strtotime($bill['next_due_date']));?><br>
+        <?php } else {
+          echo date("F j\<\s\u\p\>S\<\/\s\u\p\>, Y", strtotime($bill['next_due_date']));?><br>
+        <?php } ?>
+*/ ?>
 
-        <?php // echo htmlspecialchars((string)$bill['next_due_date'], ENT_QUOTES, 'UTF-8'); ?>
+        <?php if (!empty($bill['actual_due_date'])): ?>
+          <strong>Next Scheduled Draft:</strong>
+          <?php echo date('m.d.y', strtotime($bill['actual_due_date'])); ?><br>
+        <?php endif; ?>
+
+        <strong>Next Attention Date:</strong>
+        <?php if ($next_attention && !empty($next_attention['due_date'])): ?>
+          <?php echo date('m.d.y', strtotime($next_attention['due_date'])); ?>
+          <?php if (!empty($next_attention['remaining_due'])): ?>
+            - needs $<?php echo number_format((float)$next_attention['remaining_due'], 2); ?><br>
+          <?php endif; ?>
+        <?php else: ?>
+          Fully covered in current projection window<br>
+        <?php endif; ?>
+
 
         Cadence: <?php echo htmlspecialchars((string)$bill['cadence'], ENT_QUOTES, 'UTF-8'); ?><br>
 
-
-
-
-
-
-
-
-Paid From:
-<?php if (!empty($bill['default_funding_account_id']) && !empty($bill['paid_from_account'])): ?>
-  <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$bill['default_funding_account_id']; ?>">
-    <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
-  </a>
-<?php else: ?>
-  <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
-<?php endif; ?>
-
-
-
-
-
+        Paid From:
+        <?php if (!empty($bill['default_funding_account_id']) && !empty($bill['paid_from_account'])): ?>
+          <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$bill['default_funding_account_id']; ?>">
+            <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
+          </a>
+        <?php else: ?>
+          <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
+        <?php endif; ?>
 
       </div>
-
-
-
-
-
-
-<?php /* Reserve history is history...
-
-      <h2>Reserve History</h2>
-
-      <?php if ($reserve_transactions): ?>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($reserve_transactions as $tx): ?>
-              <tr>
-
-                <td>
-                  <?php
-                  echo !empty($tx['transaction_date'])
-                    ? date("m.d.y \\a\\t H:i", strtotime($tx['transaction_date']))
-                    : '';
-                  ?>
-                </td>
-
-                <td><?php echo htmlspecialchars((string)$tx['transaction_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-                <td>$<?php echo number_format((float)$tx['amount'], 2); ?></td>
-                <td><?php echo nl2br(htmlspecialchars((string)$tx['note'], ENT_QUOTES, 'UTF-8')); ?></td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-      <?php else: ?>
-        <p>No reserve transactions yet.</p>
-      <?php endif; ?>
-
-*/ ?>
-
-
-
-
 
       <h2>Payment History</h2>
 
@@ -246,7 +205,18 @@ Paid From:
           <tbody>
             <?php foreach ($payments as $payment): ?>
               <tr>
-                <td><?php echo htmlspecialchars((string)$payment['due_date'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td>
+                  <?php /* was...
+                  <?php echo htmlspecialchars((string)$payment['due_date'], ENT_QUOTES, 'UTF-8'); ?>
+                  */ ?>
+                  <?php
+                    $dueDate = $payment['due_date'];
+                    if ($dueDate) {
+                      $dateObj = new DateTime($dueDate);
+                      echo htmlspecialchars($dateObj->format('m.d.y'), ENT_QUOTES, 'UTF-8');
+                    }
+                  ?>
+                </td>
 
                 <td>
                   <?php
@@ -267,12 +237,6 @@ Paid From:
       <?php else: ?>
         <p>No payments recorded yet.</p>
       <?php endif; ?>
-
-
-
-
-
-
 
       <h2>General Notes</h2>
 
@@ -326,12 +290,6 @@ Paid From:
         <a href="index.php">Dashboard</a> |
         <a href="billing_projection.php">Projection</a> |
         <a href="reserve_adjustment.php">Reserve Adjustment</a>
-    
-        <?php /*       
-        <a href="billing_accounts.php">All Billing Accounts</a> |
-        <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$bill['billing_account_id']; ?>">Edit This Bill</a> |
-        <a href="contribute_to_reserve.php?billing_account_id=<?php echo (int)$bill['billing_account_id']; ?>">Contribute</a>
-        */ ?>
       </div>
     <?php endif; ?>
 

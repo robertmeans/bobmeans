@@ -92,24 +92,52 @@ require '_includes/nav.php';
       </div>
     <?php endif; ?>
 
-    <?php if ($funding_accounts): ?>
-      <form class="pro-acct" method="get" style="margin-bottom: 1em;"> 
-        <label for="funding_account_id"><strong>Funding Account:</strong></label>
-        <select id="funding_account_id" name="funding_account_id" onchange="this.form.submit()">
-          <?php foreach ($funding_accounts as $account): ?>
-            <option value="<?php echo (int)$account['funding_account_id']; ?>" <?php echo ((int)$funding_account_id === (int)$account['funding_account_id']) ? 'selected' : ''; ?>>
-              <?php echo htmlspecialchars($account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-        <noscript><button type="submit">View</button></noscript>
-      </form>
-    <?php endif; ?>
+
+
+    <?php 
+    /*  $single_fund_acct = determine whether there is more than 1 funding account
+        in order to present accordingly (e.g., dropdown or no dropdown,
+        the need for the word "selected" or not, etc.) */
+    if (count($funding_accounts) === 1) { 
+      $single_fund_acct = 'yes'; 
+    } else { 
+      $single_fund_acct = 'no'; 
+    } ?>
+
+
+    <?php if ($single_fund_acct !== 'yes') { ?>
+      <?php if ($funding_accounts): ?>
+        <form class="pro-acct" method="get" style="margin-bottom: 1em;"> 
+          <label for="funding_account_id"><strong>View Funding Ledger:</strong></label>
+          <select id="funding_account_id" name="funding_account_id" onchange="this.form.submit()">
+            <?php foreach ($funding_accounts as $account): ?>
+              <option value="<?php echo (int)$account['funding_account_id']; ?>" <?php echo ((int)$funding_account_id === (int)$account['funding_account_id']) ? 'selected' : ''; ?>>
+                <?php echo htmlspecialchars($account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <noscript><button type="submit">View</button></noscript>
+        </form>
+      <?php endif; ?>
+    <?php } else { ?>
+      You only have 1 funding account.
+    <?php } ?>
+
+
+
 
     <?php if ($funding_account): ?>
       <div class="success" style="display:block;">
+
         <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong><br>
         Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
+
+        <?php if (!empty($funding_account['login_url'])): ?>
+          <br><a href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+            Login to <?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
+          </a><br>
+        <?php endif; ?>
+      
       </div>
 
       <?php if ($ledger_rows): ?>
@@ -126,13 +154,16 @@ require '_includes/nav.php';
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($ledger_rows as $row): ?>
+            <?php foreach ($ledger_rows as $row): 
+              $haystack = htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8');
+              $needle = "Automatic draft deduction"; ?>
               <tr class="<?php echo ((float)$row['signed_amount'] < 0) ? 'due' : 'paid'; ?>">
                 <td>
-                  <?php
-                  echo !empty($row['event_datetime'])
-                    ? date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']))
-                    : '';
+                  <?php if (!empty($row['event_datetime']) && !str_contains($haystack, $needle)) {
+                    echo date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']));
+                  } else {
+                    echo date("m.d.y", strtotime($row['event_datetime']));
+                  }
                   ?>
                 </td>
 
@@ -150,15 +181,15 @@ require '_includes/nav.php';
                   ?>
                 </td>
 
-<td>
-  <?php if (!empty($row['billing_account_id'])): ?>
-    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
-      <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
-    </a>
-  <?php else: ?>
-    &nbsp;
-  <?php endif; ?>
-</td>
+                <td>
+                  <?php if (!empty($row['billing_account_id'])): ?>
+                    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
+                      <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                  <?php else: ?>
+                    &nbsp;
+                  <?php endif; ?>
+                </td>
 
                 <td><?php echo htmlspecialchars((string)$row['sub_type'], ENT_QUOTES, 'UTF-8'); ?></td>
 
