@@ -127,6 +127,10 @@ require '_includes/nav.php';
         <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong><br>
         Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
 
+        <br><a href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">
+          Adjust Balance
+        </a>
+
         <?php if (!empty($funding_account['login_url'])): ?>
           <br><a class="btn-one" href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
             Login to <?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
@@ -146,6 +150,7 @@ require '_includes/nav.php';
               <th>Amount</th>
               <th>Running Balance</th>
               <th>Note</th>
+              <th>Edit Note</th>
             </tr>
           </thead>
           <tbody>
@@ -198,6 +203,14 @@ require '_includes/nav.php';
                 <td>$<?php echo number_format((float)$row['running_balance'], 2); ?></td>
 
                 <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+
+                <td style="text-align: center;">
+                  <a href="edit_note.php?source=funding&id=<?php echo (int)$row['id']; ?>">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                </td>
+
+
               </tr>
             <?php endforeach; ?>
           </tbody>
@@ -208,9 +221,10 @@ require '_includes/nav.php';
 
       <div class="inner-links">
         <a href="index.php">Dashboard</a> |
+        <a href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a> | 
         <a href="reserve_adjustment.php">Reserve Adjustment</a> |
-        <a href="funding_accounts.php">Funding Accounts</a> |
-        <a href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a>
+        <a href="funding_accounts.php">Funding Accounts</a>
+        
       </div>
     <?php endif; ?>
 

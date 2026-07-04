@@ -991,6 +991,7 @@ function funding_account_ledger_rows(PDO $pdo_db, int $user_id, int $funding_acc
 
   $stmt = $pdo_db->prepare("
     SELECT
+      fart.funding_account_reserve_transaction_id AS id,
       fart.transaction_date AS event_datetime,
       'account_transaction' AS event_type,
       fart.transaction_type AS sub_type,
@@ -1022,7 +1023,7 @@ function funding_account_ledger_rows(PDO $pdo_db, int $user_id, int $funding_acc
       return strcmp((string)$a['sub_type'], (string)$b['sub_type']);
     }
 
-    return strcmp((string)$a['event_datetime'], (string)$b['event_datetime']);
+    return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
   });
 
   return $ledger;
@@ -1391,4 +1392,117 @@ function archive_billing_account(PDO $pdo_db, int $user_id, int $billing_account
     $billing_account_id,
     $user_id
   ]);
+}
+
+function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_id): array
+{
+  $timeline = [];
+
+  /*
+    activity log entries
+  */
+  $stmt = $pdo_db->prepare("
+    SELECT
+      bill_activity_log_id,
+      activity_date AS event_datetime,
+      'activity' AS event_source,
+      activity_type,
+      field_name,
+      old_value,
+      new_value,
+      note
+    FROM bill_activity_log
+    WHERE billing_account_id = ?
+      AND user_id = ?
+  ");
+  $stmt->execute([$billing_account_id, $user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  foreach ($rows as $row) {
+    $timeline[] = [
+      'id' => (int)$row['bill_activity_log_id'],
+      'event_datetime' => $row['event_datetime'],
+      'event_source' => 'activity',
+      'label' => (string)$row['activity_type'],
+      'field_name' => $row['field_name'],
+      'old_value' => $row['old_value'],
+      'new_value' => $row['new_value'],
+      'amount' => null,
+      'note' => $row['note']
+    ];
+  }
+
+  /*
+    payment entries
+  */
+  $stmt = $pdo_db->prepare("
+    SELECT
+      bill_payment_id,
+      CONCAT(date_paid, ' 00:00:00') AS event_datetime,
+      amount_paid,
+      confirmation_note
+    FROM bill_payments
+    WHERE billing_account_id = ?
+      AND user_id = ?
+      AND status = 'paid'
+  ");
+  $stmt->execute([$billing_account_id, $user_id]);
+  $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  foreach ($rows as $row) {
+    $timeline[] = [
+      'id' => (int)$row['bill_payment_id'],
+      'event_datetime' => $row['event_datetime'],
+      'event_source' => 'payment',
+      'label' => 'payment',
+      'field_name' => null,
+      'old_value' => null,
+      'new_value' => null,
+      'amount' => (float)$row['amount_paid'],
+      'note' => $row['confirmation_note']
+    ];
+  }
+
+  usort($timeline, function ($a, $b) {
+    if ($a['event_datetime'] === $b['event_datetime']) {
+      return strcmp((string)$a['label'], (string)$b['label']);
+    }
+
+    return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
+  });
+
+  return $timeline;
+}
+
+function normalize_activity_log_field_value(string $field_name, $value): ?string
+{
+  if ($value === null) {
+    return null;
+  }
+
+  if (in_array($field_name, ['default_amount'], true)) {
+    return number_format((float)$value, 2, '.', '');
+  }
+
+  if (in_array($field_name, [
+    'renewal_term_months',
+    'due_day_of_month',
+    'due_month_of_year',
+    'default_funding_account_id',
+    'transfer_from_funding_account_id',
+    'is_autopay',
+    'auto_advance_on_payment',
+    'is_active',
+    'sort_order'
+  ], true)) {
+    return (string)(int)$value;
+  }
+
+  $value = trim((string)$value);
+
+  if ($value === '') {
+    return null;
+  }
+
+  return $value;
 }

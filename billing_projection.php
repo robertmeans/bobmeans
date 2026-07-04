@@ -20,11 +20,11 @@ $stmt = $pdo_db->prepare("
     ba.cadence,
     ba.reserve_style,
     ba.default_amount,
-    ba.next_due_date,
     ba.actual_due_date,
     ba.renewal_term_months,
     ba.due_day_of_month,
     ba.due_month_of_year,
+    ba.default_funding_account_id,
     ba.is_active,
     fa.account_name AS paid_from_account
   FROM billing_accounts ba
@@ -87,7 +87,6 @@ require '_includes/nav.php';
       </form>
     <?php } ?>
 
-
 <?php /*
       <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
         <div class="success" style="display:block;">
@@ -99,7 +98,6 @@ require '_includes/nav.php';
       <?php endif; ?>
 */ ?>
 
-
       <div>
 
         <?php if ($single_fund_acct !== 'yes') { ?>
@@ -109,6 +107,7 @@ require '_includes/nav.php';
             <?php if ($selected_account === $account_name) { ?>
               <div class="selected-fund">
                 <i class="fas fa-star"></i>&nbsp; [selected]
+                
                 <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> 
                 $<?php echo number_format($amount, 2); ?>
                 &nbsp;<i class="fas fa-star"></i>
@@ -120,28 +119,21 @@ require '_includes/nav.php';
               </div>
            <?php } ?>
 
-  
         <?php endforeach; ?>
 
         <?php } else { ?>
 
               <div>
-                You only have 1 funding account.
+                You only have 1 funding account. - <a href="intake_funding-accounts.php">Add another</a>
               </div>
 
         <?php } ?>
-
-
 
         <div style="display: flex;margin: 0.5em 0 0.5em;">
           <strong><?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?> Reserve Used In Projection:</strong>&nbsp; $<?php echo number_format($projection['starting_pool'], 2); ?>
         </div>
 
-
-
       </div>
-
-
 
     <div class="table-container">
     <table>
@@ -180,6 +172,7 @@ require '_includes/nav.php';
           }
         }
 
+        $linked_first_uncovered = false; /* flag first partial or due for hyperlink in "Remaining Due" column */
         foreach ($projection['events'] as $index => $event): 
 
         $row_classes = [$event['status']];
@@ -195,14 +188,14 @@ require '_includes/nav.php';
           <td>
             <a class="editAcctLink" href="bill_details.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
 
-        <?php if (false): ?>
-            <?php if ($event['vendor_name'] !== ''): ?>
-              <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
+            <?php if (false): ?>
+                <?php if ($event['vendor_name'] !== ''): ?>
+                  <br><small><?php echo htmlspecialchars($event['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
+                <?php endif; ?>
+                <?php if ($event['intake_note'] !== ''): ?>
+                  <br><small><?php echo htmlspecialchars($event['intake_note'], ENT_QUOTES, 'UTF-8'); ?></small>
+                <?php endif; ?>
             <?php endif; ?>
-            <?php if ($event['intake_note'] !== ''): ?>
-              <br><small><?php echo htmlspecialchars($event['intake_note'], ENT_QUOTES, 'UTF-8'); ?></small>
-            <?php endif; ?>
-        <?php endif; ?>
           </td>
 
           <td <?php if ($event['status'] === 'partial') { echo 'class="fpdue"'; } ?>><?php echo date('m.d.y', strtotime($event['due_date'])); ?></td>
@@ -223,7 +216,26 @@ require '_includes/nav.php';
 
           <td>$<?php echo number_format((float)$event['covered_by_pool'], 2); ?></td>
 
-          <td <?php if ($event['status'] === 'partial') { echo 'class="fpdue"'; } ?>>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
+          <td <?php if ($event['status'] === 'partial') { echo 'class="fpdue"'; } ?>>
+
+            <?php
+            $is_uncovered = (
+              ((string)$event['status'] === 'partial' || (string)$event['status'] === 'due') &&
+              !empty($event['default_funding_account_id']) &&
+              (float)$event['remaining_due'] > 0
+            );
+            ?>
+
+            <?php if ($is_uncovered && !$linked_first_uncovered): ?>
+              <a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$event['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$event['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$event['billing_name']); ?>&transaction_type=contribution">
+                $<?php echo number_format((float)$event['remaining_due'], 2); ?>
+              </a>
+              <?php $linked_first_uncovered = true; ?>
+            <?php else: ?>
+              $<?php echo number_format((float)$event['remaining_due'], 2); ?>
+            <?php endif; ?>
+
+          </td>
 
           <td>$<?php echo number_format((float)$event['pool_remaining_after'], 2); ?></td>
         </tr>

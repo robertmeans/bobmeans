@@ -12,6 +12,7 @@ $bill = null;
 $payments = [];
 $notes = [];
 $new_note_body = '';
+$vendor_name = '';
 
 if (isset($_GET['billing_account_id']) && ctype_digit((string)$_GET['billing_account_id'])) {
   $billing_account_id = (int)$_GET['billing_account_id'];
@@ -118,6 +119,8 @@ if (!empty($bill['default_funding_account_id'])) {
   );
 }
 
+$bill_activity = bill_activity_timeline($pdo_db, $user_id, $billing_account_id);
+
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -138,7 +141,9 @@ require '_includes/nav.php';
     <?php endif; ?>
 
     <?php if ($bill):
-    $bill_acct_name = htmlspecialchars($bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+    $bill_acct_name = htmlspecialchars($bill['billing_name'], ENT_QUOTES, 'UTF-8');
+    if ($bill['vendor_name']) { $vendor_name = htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); } 
+    ?>
 
       <div class="success" style="display:block;">
 
@@ -148,16 +153,6 @@ require '_includes/nav.php';
           Vendor: <?php echo htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); ?><br>
         <?php endif; ?>
         Base Amount: $<?php echo number_format((float)$bill['default_amount'], 2); ?><br>
-
-
-<?php /*
-        Next Due Date: 
-        <?php if (date('y') === date('y', strtotime($bill['next_due_date']))) {
-          echo date("F j\<\s\u\p\>S\<\/\s\u\p\>", strtotime($bill['next_due_date']));?><br>
-        <?php } else {
-          echo date("F j\<\s\u\p\>S\<\/\s\u\p\>, Y", strtotime($bill['next_due_date']));?><br>
-        <?php } ?>
-*/ ?>
 
         <?php if (!empty($bill['actual_due_date'])): ?>
           <strong>Next Scheduled Draft:</strong>
@@ -174,7 +169,6 @@ require '_includes/nav.php';
           Fully covered in current projection window<br>
         <?php endif; ?>
 
-
         Cadence: <?php echo htmlspecialchars((string)$bill['cadence'], ENT_QUOTES, 'UTF-8'); ?><br>
 
         Paid From:
@@ -186,56 +180,77 @@ require '_includes/nav.php';
           <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
         <?php endif; ?>
 
+        <?php if (!empty($bill['login_url'])): ?>
+          <br><a class="btn-one" href="<?php echo htmlspecialchars((string)$bill['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+            Login to <?php if ($vendor_name !== '') { echo $vendor_name; } else { echo $bill_acct_name; } ?>
+          </a><br>
+        <?php endif; ?>
+
       </div>
 
-      <h2>Payment History</h2>
+      <h2>Bill Activity</h2>
 
-      <?php if ($payments): ?>
-        <table>
+      <?php if ($bill_activity): ?>
+        <table class="full-width">
           <thead>
             <tr>
-              <th>Due Date</th>
-              <th>Date Paid</th>
-              <th>Status</th>
-              <th>Amount Due</th>
-              <th>Amount Paid</th>
+              <th>When</th>
+              <th>Type</th>
+              <th>Details</th>
+              <th>Amount</th>
               <th>Note</th>
+              <th>Edit Note</th>
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($payments as $payment): ?>
+            <?php foreach ($bill_activity as $row): ?>
               <tr>
                 <td>
-                  <?php /* was...
-                  <?php echo htmlspecialchars((string)$payment['due_date'], ENT_QUOTES, 'UTF-8'); ?>
-                  */ ?>
                   <?php
-                    $dueDate = $payment['due_date'];
-                    if ($dueDate) {
-                      $dateObj = new DateTime($dueDate);
-                      echo htmlspecialchars($dateObj->format('m.d.y'), ENT_QUOTES, 'UTF-8');
-                    }
-                  ?>
-                </td>
-
-                <td>
-                  <?php
-                  echo !empty($payment['date_paid'])
-                    ? date("m.d.y", strtotime($payment['date_paid']))
+                  echo !empty($row['event_datetime'])
+                    ? date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']))
                     : '';
                   ?>
                 </td>
 
-                <td><?php echo htmlspecialchars((string)$payment['status'], ENT_QUOTES, 'UTF-8'); ?></td>
-                <td>$<?php echo number_format((float)$payment['amount_due'], 2); ?></td>
-                <td>$<?php echo number_format((float)$payment['amount_paid'], 2); ?></td>
-                <td><?php echo nl2br(htmlspecialchars((string)$payment['confirmation_note'], ENT_QUOTES, 'UTF-8')); ?></td>
+                <td><?php echo htmlspecialchars((string)$row['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+
+                <td>
+                  <?php if ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
+                    <?php echo htmlspecialchars((string)$row['field_name'], ENT_QUOTES, 'UTF-8'); ?>
+                    changed from
+                    "<?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>"
+                    to
+                    "<?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>"
+                  <?php elseif ($row['event_source'] === 'activity'): ?>
+                    &nbsp;
+                  <?php else: ?>
+                    Payment recorded
+                  <?php endif; ?>
+                </td>
+
+                <td>
+                  <?php if ($row['amount'] !== null): ?>
+                    $<?php echo number_format((float)$row['amount'], 2); ?>
+                  <?php else: ?>
+                    &nbsp;
+                  <?php endif; ?>
+                </td>
+
+                <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+
+                <td style="text-align: center;">
+                  <a href="edit_note.php?source=<?php echo urlencode((string)$row['event_source']); ?>&id=<?php echo (int)$row['id']; ?>">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                </td>
+
               </tr>
             <?php endforeach; ?>
           </tbody>
         </table>
       <?php else: ?>
-        <p>No payments recorded yet.</p>
+        <p>No activity recorded yet.</p>
       <?php endif; ?>
 
       <h2>General Notes</h2>

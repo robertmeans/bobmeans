@@ -44,7 +44,7 @@
       <a class="sn <?php if ($layout_context === 'adjustments') { echo 'active'; } ?>" href="reserve_adjustment.php">Reserve Adjustment</a>
 
 
-      <a class="sn <?php if ($layout_context === 'billAcccounts') { echo 'active'; } ?>" href="billing_accounts.php">Bills</a>
+      <a class="sn <?php if ($layout_context === 'billAcccounts') { echo 'active'; } ?>" href="billing_accounts.php">Billing Accounts</a>
       <a class="sn <?php if ($layout_context === 'fundingAccts') { echo 'active'; } ?>" href="funding_accounts.php">Funding Accounts</a>
       <a class="sn <?php if ($layout_context === 'fundingAcctLedger') { echo 'active'; } ?>" href="funding_account_ledger.php">Funding Account Ledger</a>
       <a class="sn <?php if ($layout_context === 'intakeBilling') { echo 'active'; } ?>" href="intake_billing-accounts.php">Add New Bill</a>

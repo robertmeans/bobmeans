@@ -51,11 +51,11 @@ $funding_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 /* defaults from current row */
 $billing_name = $billing_account['billing_name'] ?? '';
 $vendor_name = $billing_account['vendor_name'] ?? '';
+$login_url = $billing_account['login_url'] ?? '';
 $intake_note = $billing_account['intake_note'] ?? '';
 $cadence = $billing_account['cadence'] ?? 'monthly';
 $reserve_style = $billing_account['reserve_style'] ?? 'sinking_fund';
 $default_amount = isset($billing_account['default_amount']) ? (string)$billing_account['default_amount'] : '';
-$next_due_date = $billing_account['next_due_date'] ?? '';
 $actual_due_date = $billing_account['actual_due_date'] ?? '';
 $renewal_term_months = isset($billing_account['renewal_term_months']) ? (string)$billing_account['renewal_term_months'] : '1';
 $due_day_of_month = isset($billing_account['due_day_of_month']) ? (string)$billing_account['due_day_of_month'] : '';
@@ -71,11 +71,11 @@ $sort_order = isset($billing_account['sort_order']) ? (string)$billing_account['
 if (is_post_request() && isset($_POST['update_billing_account']) && $billing_account) {
   $billing_name = trim($_POST['billing_name'] ?? '');
   $vendor_name = trim($_POST['vendor_name'] ?? '');
+  $login_url = trim($_POST['login_url'] ?? '');
   $intake_note = trim($_POST['intake_note'] ?? '');
   $cadence = trim($_POST['cadence'] ?? 'monthly');
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
-  $next_due_date = trim($_POST['next_due_date'] ?? '');
   $actual_due_date = trim($_POST['actual_due_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '1');
   $due_day_of_month = trim($_POST['due_day_of_month'] ?? '');
@@ -87,8 +87,30 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
   $is_active = isset($_POST['is_active']) ? 1 : 0;
   $sort_order = trim($_POST['sort_order'] ?? '0');
 
+  $fields_to_track = [
+    'billing_name',
+    'vendor_name',
+    'login_url',
+    'default_amount',
+    'actual_due_date',
+    'cadence',
+    'renewal_term_months',
+    'due_day_of_month',
+    'due_month_of_year',
+    'default_funding_account_id',
+    'transfer_from_funding_account_id',
+    'is_autopay',
+    'auto_advance_on_payment',
+    'is_active',
+    'sort_order'
+  ];
+
   if ($billing_name === '') {
     $errors[] = 'Billing account name is required.';
+  }
+
+  if ($login_url !== '' && !filter_var($login_url, FILTER_VALIDATE_URL)) {
+    $errors[] = 'Login URL must be a valid URL.';
   }
 
   if (!in_array($cadence, ['monthly', 'annual', 'custom'], true)) {
@@ -102,10 +124,6 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
   if ($default_amount === '' || !is_numeric($default_amount) || (float)$default_amount < 0) {
     $errors[] = 'Amount due must be numeric.';
   }
-
-  // if ($next_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
-  //   $errors[] = 'Next due date must be in YYYY-MM-DD format.';
-  // }
 
   if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
     $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
@@ -160,11 +178,11 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
     SET
       billing_name = ?,
       vendor_name = ?,
+      login_url = ?,
       intake_note = ?,
       cadence = ?,
       reserve_style = ?,
       default_amount = ?,
-      next_due_date = ?,
       actual_due_date = ?,
       renewal_term_months = ?,
       due_day_of_month = ?,
@@ -184,11 +202,11 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
     $stmt->execute([
       $billing_name,
       $vendor_name !== '' ? $vendor_name : null,
+      $login_url !== '' ? $login_url : null,
       $intake_note !== '' ? $intake_note : null,
       $cadence,
       $reserve_style,
       $default_amount,
-      $next_due_date,
       $actual_due_date,
       $renewal_term_months,
       $due_day_of_month,
@@ -203,7 +221,35 @@ if (is_post_request() && isset($_POST['update_billing_account']) && $billing_acc
       $user_id
     ]);
 
-    header('Location: billing_projection.php');
+    foreach ($fields_to_track as $field_name) {
+      $old_value = normalize_activity_log_field_value($field_name, $billing_account[$field_name] ?? null);
+      $new_value = normalize_activity_log_field_value($field_name, $$field_name ?? null);
+
+      if ($old_value !== $new_value) {
+        $stmt = $pdo_db->prepare("
+          INSERT INTO bill_activity_log (
+            billing_account_id,
+            user_id,
+            activity_type,
+            field_name,
+            old_value,
+            new_value,
+            note
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+          $billing_account_id,
+          $user_id,
+          'updated',
+          $field_name,
+          $old_value,
+          $new_value,
+          null
+        ]);
+      }
+    }
+
+    header('Location: billing_accounts.php');
     exit();
   }
 }
@@ -244,6 +290,17 @@ require '_includes/nav.php';
           </div>
         </div>
 
+        <div class="row standalone">
+          <label for="login_url">Login URL</label>
+          <input
+            type="url"
+            id="login_url"
+            name="login_url"
+            value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
+            placeholder="https://example.com/login"
+          >
+        </div>
+
         <div class="two-col">
           <div class="row">
             <label for="cadence">Cadence</label>
@@ -254,17 +311,11 @@ require '_includes/nav.php';
             </select>
           </div>
 
-
-
           <div class="row">
             <label for="renewal_term_months">Renewal Term (Months)</label>
             <input type="number" id="renewal_term_months" name="renewal_term_months" min="1" value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
         </div>
-
-
-
-
 
         <div class="two-col">
 
@@ -282,23 +333,7 @@ require '_includes/nav.php';
             >
           </div>
 
-          <div class="row">
-            <?php /* 
-            <label for="next_due_date">Next Due Date</label>
-            <input
-              type="date"
-              id="next_due_date"
-              name="next_due_date"
-              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-              required
-            >
-            */ ?>
-            &nbsp;
-          </div>
-
-
         </div>
-
 
         <div class="two-col">
 
@@ -307,16 +342,12 @@ require '_includes/nav.php';
             <input type="number" id="due_month_of_year" name="due_month_of_year" min="1" max="12" value="<?php echo htmlspecialchars((string)$due_month_of_year, ENT_QUOTES, 'UTF-8'); ?>">
           </div>
 
-
           <div class="row">
             <label for="due_day_of_month">Due Day of Month</label>
             <input type="number" id="due_day_of_month" name="due_day_of_month" min="1" max="31" value="<?php echo htmlspecialchars((string)$due_day_of_month, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
 
-
         </div>
-
-
 
         <div class="two-col">
           <div class="row">
@@ -325,10 +356,6 @@ require '_includes/nav.php';
           </div>
 
         </div>
-
-
-
-
 
         <div class="two-col">
 
@@ -353,27 +380,6 @@ require '_includes/nav.php';
           </div>
 
         </div>
-
-        <?php /*
-        <div class="two-col">
-          <div class="row">
-            &nbsp;
-          </div>
-
-          <div class="row">
-            <label for="transfer_from_funding_account_id">Transferred From Account</label>
-            <select id="transfer_from_funding_account_id" name="transfer_from_funding_account_id">
-              <option value="">-- Select --</option>
-              <?php foreach ($funding_accounts as $funding): ?>
-                <option value="<?php echo (int)$funding['funding_account_id']; ?>" <?php echo ((string)$transfer_from_funding_account_id === (string)$funding['funding_account_id']) ? 'selected' : ''; ?>>
-                  <?php echo htmlspecialchars($funding['account_name'], ENT_QUOTES, 'UTF-8'); ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-        </div>
-        */ ?>
-
 
         <div class="row standalone">
           <label for="intake_note">Billing Memo</label>

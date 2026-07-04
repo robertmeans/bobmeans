@@ -25,7 +25,6 @@ $stmt = $pdo_db->prepare("
     ba.cadence,
     ba.reserve_style,
     ba.default_amount,
-    ba.next_due_date,
     ba.actual_due_date,
     ba.renewal_term_months,
     ba.due_day_of_month,
@@ -298,6 +297,7 @@ require '_includes/nav.php';
               </tr>
             </thead>
             <tbody>
+              <?php $linked_first_uncovered = false; /* flag first partial or due for hyperlink in "Remaining Due" column */ ?>
               <?php foreach ($exceptions as $event):
               $fund_account = htmlspecialchars((string)$event['funding_account'], ENT_QUOTES, 'UTF-8');
               $fund_account_id = (int)$event['default_funding_account_id']; ?>
@@ -329,7 +329,28 @@ require '_includes/nav.php';
                   </td>
 
                   <td><?php echo htmlspecialchars(ucfirst($event['status']), ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td>$<?php echo number_format((float)$event['remaining_due'], 2); ?></td>
+
+                  <td>
+
+                    <?php
+                    $is_uncovered = (
+                      ((string)$event['status'] === 'partial' || (string)$event['status'] === 'due') &&
+                      !empty($event['default_funding_account_id']) &&
+                      (float)$event['remaining_due'] > 0
+                    );
+                    ?>
+
+                    <?php if ($is_uncovered && !$linked_first_uncovered): ?>
+                      <a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$event['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$event['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$event['billing_name']); ?>&transaction_type=contribution">
+                        $<?php echo number_format((float)$event['remaining_due'], 2); ?>
+                      </a>
+                      <?php $linked_first_uncovered = true; ?>
+                    <?php else: ?>
+                      $<?php echo number_format((float)$event['remaining_due'], 2); ?>
+                    <?php endif; ?>
+
+                  </td>
+
                 </tr>
               <?php endforeach; ?>
             </tbody>

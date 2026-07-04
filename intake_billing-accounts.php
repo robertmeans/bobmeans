@@ -10,13 +10,14 @@ $errors = [];
 
 $billing_name = '';
 $vendor_name = '';
+$login_url = '';
 $cadence = 'monthly';
 $reserve_style = 'sinking_fund';
 $default_amount = '';
 // $annual_cost = '';
 $due_day_of_month = '';
 $due_month_of_year = '';
-$next_due_date = '';
+// $next_due_date = '';
 $actual_due_date = '';
 $paid_through_date = '';
 // $last_paid_date = '';
@@ -60,7 +61,6 @@ if (
     $cadence = (string)($duplicate_bill['cadence'] ?? 'monthly');
     $reserve_style = (string)($duplicate_bill['reserve_style'] ?? 'sinking_fund');
     $default_amount = isset($duplicate_bill['default_amount']) ? (string)$duplicate_bill['default_amount'] : '';
-    $next_due_date = (string)($duplicate_bill['next_due_date'] ?? '');
     $actual_due_date = (string)($duplicate_bill['actual_due_date'] ?? '');
     $renewal_term_months = isset($duplicate_bill['renewal_term_months']) ? (string)$duplicate_bill['renewal_term_months'] : '1';
     $due_day_of_month = isset($duplicate_bill['due_day_of_month']) ? (string)$duplicate_bill['due_day_of_month'] : '';
@@ -89,12 +89,12 @@ $funding_accounts = $stmt->fetchAll();
 if (is_post_request() && isset($_POST['create_billing_account'])) {
   $billing_name = trim($_POST['billing_name'] ?? '');
   $vendor_name = trim($_POST['vendor_name'] ?? '');
+  $login_url = trim($_POST['login_url'] ?? '');
   $cadence = trim($_POST['cadence'] ?? 'monthly');
   $reserve_style = trim($_POST['reserve_style'] ?? 'sinking_fund');
   $default_amount = trim($_POST['default_amount'] ?? '');
   $due_day_of_month = trim($_POST['due_day_of_month'] ?? '');
   $due_month_of_year = trim($_POST['due_month_of_year'] ?? '');
-  $next_due_date = trim($_POST['next_due_date'] ?? '');
   $actual_due_date = trim($_POST['actual_due_date'] ?? '');
   $renewal_term_months = trim($_POST['renewal_term_months'] ?? '12');
   $default_funding_account_id = trim($_POST['default_funding_account_id'] ?? '');
@@ -107,6 +107,10 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
 
   if ($billing_name === '') {
     $errors[] = 'Billing account name is required.';
+  }
+
+  if ($login_url !== '' && !filter_var($login_url, FILTER_VALIDATE_URL)) {
+    $errors[] = 'Login URL must be a valid URL.';
   }
 
   if (!in_array($cadence, ['monthly', 'annual', 'custom'], true)) {
@@ -137,14 +141,6 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
   } else {
     $due_month_of_year = null;
   }
-
-  // if ($next_due_date === '') {
-  //   $errors[] = 'Next due date is required.';
-  // }
-
-  // if ($next_due_date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next_due_date)) {
-  //   $errors[] = 'Next due date must be in YYYY-MM-DD format.';
-  // }
 
   if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
     $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
@@ -186,11 +182,11 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
         user_id,
         billing_name,
         vendor_name,
+        login_url,
         intake_note,
         cadence,
         reserve_style,
         default_amount,
-        next_due_date,
         actual_due_date,
         renewal_term_months,
         due_day_of_month,
@@ -208,11 +204,11 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       $user_id,
       $billing_name,
       $vendor_name !== '' ? $vendor_name : null,
+      $login_url !== '' ? $login_url : null,
       $intake_note !== '' ? $intake_note : null,
       $cadence,
       $reserve_style,
       $default_amount,
-      $next_due_date,
       $actual_due_date,
       $renewal_term_months,
       $due_day_of_month,
@@ -226,6 +222,26 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     ]);
 
     $new_billing_account_id = (int)$pdo_db->lastInsertId();
+
+
+
+    $stmt = $pdo_db->prepare("
+      INSERT INTO bill_activity_log (
+        billing_account_id,
+        user_id,
+        activity_type,
+        note
+      ) VALUES (?, ?, ?, ?)
+    ");
+    $stmt->execute([
+      $new_billing_account_id,
+      $user_id,
+      'created',
+      'Billing account created.'
+    ]);
+
+
+
 
     $redirect_name = urlencode($billing_name);
 
@@ -302,6 +318,17 @@ require '_includes/nav.php';
           </div>
         </div>
 
+        <div class="row standalone">
+          <label for="login_url">Login URL</label>
+          <input
+            type="url"
+            id="login_url"
+            name="login_url"
+            value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
+            placeholder="https://example.com/login"
+          >
+        </div>
+
         <div class="two-col">
           <div class="row">
             <label for="cadence">Cadence</label>
@@ -334,27 +361,12 @@ require '_includes/nav.php';
              <label for="actual_due_date">Next Calendar Due Date</label>
             <input
               type="date"
-              id="actual_due_date"
+              id="actual_due_date" <?php /* using this ID for JS purposes to dynamically reveal Due Month of Year */ ?>
               name="actual_due_date"
               value="<?php echo htmlspecialchars($actual_due_date, ENT_QUOTES, 'UTF-8'); ?>"
               required
             >
           </div>
-
-          <div class="row">
-            <?php /* 
-            <label for="next_due_date">Next Due Date</label>
-            <input
-              type="date"
-              id="next_due_date"
-              name="next_due_date"
-              value="<?php echo htmlspecialchars($next_due_date, ENT_QUOTES, 'UTF-8'); ?>"
-              required
-            >
-            */ ?>
-            &nbsp;
-          </div>
-
 
         </div>
 

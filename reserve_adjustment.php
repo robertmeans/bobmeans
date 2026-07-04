@@ -28,7 +28,7 @@ if (isset($_GET['transaction_type']) && in_array($_GET['transaction_type'], ['co
 }
 
 if (isset($_GET['bill']) && trim($_GET['bill']) !== '' && $adjustment_note === '') {
-  $adjustment_note = 'Added from homepage for upcoming bill: ' . trim($_GET['bill']);
+  $adjustment_note = 'Added balance for upcoming bill: ' . trim($_GET['bill']);
 }
 
 $funding_accounts = funding_account_selector_options($pdo_db, $user_id);
@@ -93,7 +93,8 @@ if (is_post_request() && isset($_POST['submit_reserve_adjustment'])) {
     ]);
 
     $saved_name = urlencode((string)$funding_account['account_name']);
-    header('Location: reserve_adjustment.php?saved=1&account=' . $saved_name . '&type=' . urlencode($transaction_type));
+    // header('Location: reserve_adjustment.php?saved=1&account=' . $saved_name . '&type=' . urlencode($transaction_type));
+    header('Location: index.php');
     exit();
   }
 }

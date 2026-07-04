@@ -42,9 +42,10 @@ require '_includes/nav.php';
             <th>Billing Account</th>
             <th>Cadence</th>
             <th>Amount</th>
-            <th>Next Due Date</th>
+            <th>Next Draft</th>
             <th>Paid From</th>
             <th>Active</th>
+            <th>Website</th>
             <th>Manage</th>
           </tr>
         </thead>
@@ -65,11 +66,11 @@ require '_includes/nav.php';
 
             <td>
               <?php
-              if (!empty($row['next_due_date'])) {
-                echo date('m.d.y', strtotime($row['next_due_date']));
-              } else {
-                echo '&nbsp;';
-              }
+                if (!empty($row['actual_due_date']) && $row['actual_due_date'] !== '0000-00-00') {
+                  echo date('m.d.y', strtotime($row['actual_due_date']));
+                } else {
+                  echo '&nbsp;';
+                }
               ?>
             </td>
 
@@ -80,9 +81,17 @@ require '_includes/nav.php';
             </td>
 
             <td>
-              <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Edit</a>
-              |
+              <?php if (!empty($row['login_url'])): ?>
+                <a href="<?php echo htmlspecialchars((string)$row['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                  Website
+                </a>
+              <?php endif; ?>
+            </td>
+
+            <td>
               <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Details</a>
+              |
+              <a href="edit_billing-account.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Edit</a>
               |
               <a href="intake_billing-accounts.php?duplicate_billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Duplicate</a>
               <?php if ((int)$row['is_active'] === 1): ?>
