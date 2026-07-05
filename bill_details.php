@@ -120,6 +120,7 @@ if (!empty($bill['default_funding_account_id'])) {
 }
 
 $bill_activity = bill_activity_timeline($pdo_db, $user_id, $billing_account_id);
+$scheduled_amounts = upcoming_bill_amount_schedule($pdo_db, $billing_account_id, $user_id, 12);
 
 require '_includes/header.php';
 require '_includes/nav.php';
@@ -213,25 +214,52 @@ require '_includes/nav.php';
                   ?>
                 </td>
 
-                <td><?php echo htmlspecialchars((string)$row['label'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td>
+                  <?php if ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
+                    Payment Adjusted
+                  <?php elseif ($row['event_source'] === 'activity'): ?>
+                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['label'])), ENT_QUOTES, 'UTF-8'); ?>
+                  <?php else: ?>
+                    Payment
+                  <?php endif; ?>
+                </td>
 
                 <td>
-                  <?php if ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
+                  <?php if ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
+                    Payment adjusted from
+                    $<?php echo number_format((float)$row['old_value'], 2); ?>
+                    to
+                    $<?php echo number_format((float)$row['new_value'], 2); ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'created'): ?>
+                    Billing account created
+
+                  <?php elseif ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
                     <?php echo htmlspecialchars((string)$row['field_name'], ENT_QUOTES, 'UTF-8'); ?>
                     changed from
                     "<?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>"
                     to
                     "<?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>"
+
                   <?php elseif ($row['event_source'] === 'activity'): ?>
-                    &nbsp;
+                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['label'])), ENT_QUOTES, 'UTF-8'); ?>
+
                   <?php else: ?>
                     Payment recorded
                   <?php endif; ?>
                 </td>
 
+
+
                 <td>
                   <?php if ($row['amount'] !== null): ?>
-                    $<?php echo number_format((float)$row['amount'], 2); ?>
+                    <?php if ((string)$row['event_source'] === 'payment'): ?>
+                      <a href="adjust_bill_payment.php?bill_payment_id=<?php echo (int)$row['id']; ?>">
+                        $<?php echo number_format((float)$row['amount'], 2); ?>
+                      </a>
+                    <?php else: ?>
+                      $<?php echo number_format((float)$row['amount'], 2); ?>
+                    <?php endif; ?>
                   <?php else: ?>
                     &nbsp;
                   <?php endif; ?>
@@ -252,6 +280,38 @@ require '_includes/nav.php';
       <?php else: ?>
         <p>No activity recorded yet.</p>
       <?php endif; ?>
+
+
+
+      <h2>Scheduled Amounts</h2>
+      
+      <div class="inner-links">
+        <a href="add_bill_amount_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Scheduled Amount</a>
+      </div>
+
+      <?php if ($scheduled_amounts): ?>
+        <table class="full-width">
+          <thead>
+            <tr>
+              <th>Due Date</th>
+              <th>Amount</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php foreach ($scheduled_amounts as $row): ?>
+              <tr>
+                <td><?php echo date('m.d.y', strtotime((string)$row['effective_due_date'])); ?></td>
+                <td>$<?php echo number_format((float)$row['amount'], 2); ?></td>
+                <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php else: ?>
+        <p>No scheduled amount overrides yet.</p>
+      <?php endif; ?>
+
 
       <h2>General Notes</h2>
 

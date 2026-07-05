@@ -13,6 +13,7 @@ reconcile_due_bills_against_reserves($pdo_db, $user_id);
 
 $stmt = $pdo_db->prepare("
   SELECT
+    ba.user_id, 
     ba.billing_account_id,
     ba.billing_name,
     ba.vendor_name,
@@ -50,7 +51,7 @@ $projection_rows = filter_rows_by_funding_account($rows, $selected_account);
 $pool_amount = isset($reserve_totals[$selected_account]) ? (float)$reserve_totals[$selected_account] : 0.00;
 
 $months_ahead = 12;
-$events = generate_projected_bill_events($projection_rows, $months_ahead);
+$events = generate_projected_bill_events($pdo_db, $projection_rows, $months_ahead);
 $projection = apply_pool_to_projected_events($events, $pool_amount);
 
 require '_includes/header.php';

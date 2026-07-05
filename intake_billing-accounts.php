@@ -240,9 +240,6 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       'Billing account created.'
     ]);
 
-
-
-
     $redirect_name = urlencode($billing_name);
 
     if (isset($_POST['save_and_duplicate_again'])) {

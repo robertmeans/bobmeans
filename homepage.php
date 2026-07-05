@@ -18,6 +18,7 @@ if (function_exists('reconcile_due_bills_against_reserves')) {
 */
 $stmt = $pdo_db->prepare("
   SELECT
+    ba.user_id, 
     ba.billing_account_id,
     ba.billing_name,
     ba.vendor_name,
@@ -43,7 +44,7 @@ $stmt->execute([$user_id]);
 $billing_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 /* get monthly totals */
-$monthly_due_totals = dashboard_monthly_due_totals($billing_rows, 6);
+$monthly_due_totals = dashboard_monthly_due_totals($pdo_db, $billing_rows, 6);
 
 /*
   load funding accounts so we can show zero-balance accounts too
@@ -129,6 +130,7 @@ usort($account_attention_list, function ($a, $b) {
 
 
 $projection_dashboard = projection_summary_for_all_accounts(
+  $pdo_db, 
   $rows_by_account,
   $reserve_totals,
   12
@@ -390,12 +392,21 @@ require '_includes/nav.php';
                     </a>
                   </td>
                   <td><?php echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8'); ?></td>
+
                   <td>
                     <?php
                     $sign = ((float)$row['signed_amount'] < 0) ? '-' : '+';
-                    echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2);
                     ?>
+
+                    <?php if ((string)$row['event_source'] === 'bill_payment'): ?>
+                      <a href="adjust_bill_payment.php?bill_payment_id=<?php echo (int)$row['bill_payment_id']; ?>">
+                        <?php echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2); ?>
+                      </a>
+                    <?php else: ?>
+                      <?php echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2); ?>
+                    <?php endif; ?>
                   </td>
+
                   <td>
                     <?php if (htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8') === "Auto-deducted from reserve") {
                       echo 'Auto-deducted from funding account pool';

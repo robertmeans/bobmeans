@@ -119,3 +119,40 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 
+document.addEventListener('DOMContentLoaded', function () {
+  const amountInput = document.getElementById('new_actual_amount');
+
+  function formatAmount(value) {
+    const numeric = value.replace(/,/g, '').trim();
+    if (numeric === '' || isNaN(numeric)) {
+      return value;
+    }
+
+    return Number(numeric).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function unformatAmount(value) {
+    return value.replace(/,/g, '').trim();
+  }
+
+  if (amountInput) {
+    amountInput.addEventListener('blur', function () {
+      amountInput.value = formatAmount(amountInput.value);
+    });
+
+    amountInput.addEventListener('focus', function () {
+      amountInput.value = unformatAmount(amountInput.value);
+    });
+
+    amountInput.form?.addEventListener('submit', function () {
+      amountInput.value = unformatAmount(amountInput.value);
+    });
+
+    if (amountInput.value.trim() !== '') {
+      amountInput.value = formatAmount(amountInput.value);
+    }
+  }
+});
