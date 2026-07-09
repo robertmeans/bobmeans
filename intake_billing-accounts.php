@@ -1,6 +1,7 @@
 <?php
 require_once 'config/initialize.php';
 verify_loggedin();
+require '_functions/billing_functions.php';
 
 $pdo_db = pdo_connect();
 $user_id = $_SESSION['id'] ?? 1;
@@ -105,6 +106,14 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
   $is_active = isset($_POST['is_active']) ? 1 : 0;
   $sort_order = trim($_POST['sort_order'] ?? '0');
 
+  $custom_due_dates = $_POST['custom_due_date'] ?? [];
+  $custom_due_amounts = $_POST['custom_due_amount'] ?? [];
+  $custom_due_notes = $_POST['custom_due_note'] ?? [];
+
+  $custom_due_events = [];
+
+
+
   if ($billing_name === '') {
     $errors[] = 'Billing account name is required.';
   }
@@ -117,42 +126,78 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
     $errors[] = 'Cadence is invalid.';
   }
 
+  if ($default_funding_account_id === '' || !ctype_digit((string)$default_funding_account_id)) {
+    $errors[] = 'Paid From Account is required.';
+  }
+
   if (!in_array($reserve_style, ['sinking_fund', 'prepaid'], true)) {
-    $errors[] = 'Reserve style is invalid.';
+    $errors[] = 'Reserve Style is invalid.';
   }
 
-  if ($default_amount === '' || !is_numeric($default_amount)) {
-    $errors[] = 'Amount due is required and must be numeric.';
-  }
-
-  if ($due_day_of_month === '' || !ctype_digit((string)$due_day_of_month) || (int)$due_day_of_month < 1 || (int)$due_day_of_month > 31) {
-    $errors[] = 'Due day of month must be between 1 and 31.';
-  }
-
-  if ($cadence === 'annual' || $cadence === 'custom') {
-    if (
-      $due_month_of_year === '' ||
-      !ctype_digit((string)$due_month_of_year) ||
-      (int)$due_month_of_year < 1 ||
-      (int)$due_month_of_year > 12
-    ) {
-      $errors[] = 'Due month of year must be between 1 and 12.';
+  if ($cadence === 'monthly' || $cadence === 'annual') {
+    if ($renewal_term_months === '' || !ctype_digit((string)$renewal_term_months) || (int)$renewal_term_months < 1) {
+      $errors[] = 'Renewal Term (Months) must be at least 1.';
     }
-  } else {
-    $due_month_of_year = null;
+
+    if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
+      $errors[] = 'Next Calendar Due Date is required and must be in YYYY-MM-DD format.';
+    }
+
+    if ($due_day_of_month === '' || !ctype_digit((string)$due_day_of_month) || (int)$due_day_of_month < 1 || (int)$due_day_of_month > 31) {
+      $errors[] = 'Due Day of Month must be between 1 and 31.';
+    }
+
+    if ($default_amount === '' || !is_numeric($default_amount) || (float)$default_amount <= 0) {
+      $errors[] = 'Amount Due must be greater than 0.';
+    }
+
+    if ($cadence === 'annual') {
+      if ($due_month_of_year === '' || !ctype_digit((string)$due_month_of_year) || (int)$due_month_of_year < 1 || (int)$due_month_of_year > 12) {
+        $errors[] = 'Due Month of Year must be between 1 and 12.';
+      }
+    } else {
+      $due_month_of_year = '';
+    }
   }
 
-  if ($actual_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $actual_due_date)) {
-    $errors[] = 'Actual due date must be in YYYY-MM-DD format.';
+  if ($cadence === 'custom') {
+    $renewal_term_months = '';
+    $actual_due_date = '';
+    $due_day_of_month = '';
+    $due_month_of_year = '';
+    $default_amount = '';
+
+    for ($i = 0; $i < count($custom_due_dates); $i++) {
+      $due_date = trim((string)($custom_due_dates[$i] ?? ''));
+      $amount = str_replace(',', '', trim((string)($custom_due_amounts[$i] ?? '')));
+      $note = trim((string)($custom_due_notes[$i] ?? ''));
+
+      if ($due_date === '' && $amount === '' && $note === '') {
+        continue;
+      }
+
+      if ($due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due_date)) {
+        $errors[] = 'Each custom due event must include a valid due date.';
+        continue;
+      }
+
+      if ($amount === '' || !is_numeric($amount) || (float)$amount <= 0) {
+        $errors[] = 'Each custom due event must include an amount greater than 0.';
+        continue;
+      }
+
+      $custom_due_events[] = [
+        'due_date' => $due_date,
+        'amount' => number_format((float)$amount, 2, '.', ''),
+        'note' => $note
+      ];
+    }
+
+    if (empty($custom_due_events)) {
+      $errors[] = 'At least one custom due event is required when Cadence is Custom.';
+    }
   }
 
-  if ($renewal_term_months === '' || !ctype_digit((string)$renewal_term_months) || (int)$renewal_term_months < 1) {
-    $errors[] = 'Renewal term must be a whole number greater than 0.';
-  }
-
-  if ($sort_order !== '' && !ctype_digit((string)$sort_order)) {
-    $errors[] = 'Sort order must be a whole number.';
-  }
 
   $default_funding_account_id = ($default_funding_account_id === '') ? null : (int)$default_funding_account_id;
   $transfer_from_funding_account_id = ($transfer_from_funding_account_id === '') ? null : (int)$transfer_from_funding_account_id;
@@ -208,11 +253,11 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
       $intake_note !== '' ? $intake_note : null,
       $cadence,
       $reserve_style,
-      $default_amount,
-      $actual_due_date,
-      $renewal_term_months,
-      $due_day_of_month,
-      $due_month_of_year,
+      $default_amount !== '' ? (float)$default_amount : null,
+      $actual_due_date !== '' ? $actual_due_date : null,
+      $renewal_term_months !== '' ? (int)$renewal_term_months : null,
+      $due_day_of_month !== '' ? (int)$due_day_of_month : null,
+      $due_month_of_year !== '' ? (int)$due_month_of_year : null,
       $default_funding_account_id,
       $transfer_from_funding_account_id,
       $is_autopay,
@@ -223,6 +268,30 @@ if (is_post_request() && isset($_POST['create_billing_account'])) {
 
     $new_billing_account_id = (int)$pdo_db->lastInsertId();
 
+
+    if ($cadence === 'custom' && !empty($custom_due_events)) {
+      foreach ($custom_due_events as $event) {
+        $stmt = $pdo_db->prepare("
+          INSERT INTO bill_due_schedule (
+            billing_account_id,
+            user_id,
+            due_date,
+            amount,
+            note,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([
+          $new_billing_account_id,
+          $user_id,
+          $event['due_date'],
+          (float)$event['amount'],
+          $event['note'] !== '' ? $event['note'] : null
+        ]);
+      }
+
+      sync_custom_bill_actual_due_date($pdo_db, $user_id, $new_billing_account_id);
+    }
 
 
     $stmt = $pdo_db->prepare("
@@ -326,6 +395,14 @@ require '_includes/nav.php';
           >
         </div>
 
+
+
+
+
+
+
+
+
         <div class="two-col">
           <div class="row">
             <label for="cadence">Cadence</label>
@@ -336,7 +413,7 @@ require '_includes/nav.php';
             </select>
           </div>
 
-          <div class="row">
+          <div class="row" id="renewal-term-wrap">
             <label for="renewal_term_months">Renewal Term (Months)</label>
             <input
               type="number"
@@ -349,9 +426,98 @@ require '_includes/nav.php';
           </div>
         </div>
 
+
+
+
+
+
+        <div id="custom-due-events-wrap" style="display:none; margin-top: 1em;">
+          <h3>Custom Due Events</h3>
+          <p>Enter each due date and amount for this bill. Add as many future events as needed.</p>
+
+          <div id="custom-due-events">
+            <?php
+            $custom_due_events = $custom_due_events ?? [
+              ['due_date' => '', 'amount' => '', 'note' => '']
+            ];
+            ?>
+
+            <?php foreach ($custom_due_events as $index => $event): ?>
+              <div class="custom-due-event two-col" data-index="<?php echo (int)$index; ?>" style="margin-bottom: 1em; padding: 1em; border: 1px solid #ddd;">
+
+                <div class="two-col">
+                  <div class="row">
+                    <label>Due Date</label>
+                    <input
+                      type="date"
+                      name="custom_due_date[]"
+                      value="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>"
+                    >
+                  </div>
+
+                  <div class="row">
+                    <label>Amount</label>
+                    <input
+                      type="text"
+                      name="custom_due_amount[]"
+                      value="<?php echo htmlspecialchars((string)$event['amount'], ENT_QUOTES, 'UTF-8'); ?>"
+                      placeholder="0.00"
+                    >
+                  </div>
+                </div>
+
+                <div class="row standalone" style="grid-column: 1 / -1;">
+                  <label>Note</label>
+                  <input
+                    type="text"
+                    name="custom_due_note[]"
+                    value="<?php echo htmlspecialchars((string)$event['note'], ENT_QUOTES, 'UTF-8'); ?>"
+                    placeholder="Optional note"
+                  >
+                </div>
+
+                <div class="row standalone" style="grid-column: 1 / -1;">
+                  <button type="button" class="remove-custom-due-event">Remove</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+
+          <button type="button" id="add-custom-due-event">Add Another Due Event</button>
+        </div>
+        <template id="custom-due-event-template">
+          <div class="custom-due-event two-col" style="margin-bottom: 1em; padding: 1em; border: 1px solid #ddd;">
+            <div class="two-col">
+              <div class="row">
+                <label>Due Date</label>
+                <input type="date" name="custom_due_date[]">
+              </div>
+
+              <div class="row">
+                <label>Amount</label>
+                <input type="text" name="custom_due_amount[]" placeholder="0.00">
+              </div>
+            </div>
+
+            <div class="row standalone" style="grid-column: 1 / -1;">
+              <label>Note</label>
+              <input type="text" name="custom_due_note[]" placeholder="Optional note">
+            </div>
+
+            <div class="row standalone" style="grid-column: 1 / -1;">
+              <button type="button" class="remove-custom-due-event">Remove</button>
+            </div>
+          </div>
+        </template>
+
+
+
+
+
+
         <div class="two-col">
 
-          <div class="row">
+          <div class="row" id="actual-due-date-wrap">
             <?php /* Previously 'Actual Due Date' - renamed for clarity.
             <label for="actual_due_date">Actual Due Date</label> 
             */ ?>
@@ -380,7 +546,7 @@ require '_includes/nav.php';
             >
           </div>
 
-          <div class="row">
+          <div class="row" id="due-day-wrap">
             <label for="due_day_of_month">Due Day of Month</label>
             <input
               type="number"
@@ -395,7 +561,7 @@ require '_includes/nav.php';
         </div>
 
         <div class="two-col">
-          <div class="row">
+          <div class="row" id="default-amount-wrap">
             <label for="default_amount">Amount Due</label>
             <input
               type="number"

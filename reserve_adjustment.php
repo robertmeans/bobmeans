@@ -214,10 +214,24 @@ require '_includes/nav.php';
       <button type="submit">Record Transaction</button>
     </form>
 
+
+    <?php 
+    /* get the currently selected funding account name to use in the Projection link below */
+    $selected_funding_account_name = '';
+
+    foreach ($funding_accounts as $account) {
+      if ((string)$funding_account_id === (string)$account['funding_account_id']) {
+        $selected_funding_account_name = (string)$account['account_name'];
+        break;
+      }
+    }
+    ?>
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
-      <a href="billing_projection.php">Projection</a>
+      <a href="billing_projection.php<?php echo ($selected_funding_account_name !== '') ? '?account=' . urlencode($selected_funding_account_name) : ''; ?>">Projection</a>
     </div>
+
+
 
   </div>
 </div>

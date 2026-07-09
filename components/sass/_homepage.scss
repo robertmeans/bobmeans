@@ -18,8 +18,12 @@ a {
   &:visited {
     color: #0000ee;
   }
-  &.btn-one {
+  &.btn-one,
+  &.btn-two,
+  &.btn-three,
+  &.btn-four {
     display: inline-flex;
+    width: fit-content;
     justify-content: center;
     align-items: center;
     padding: 8px 15px;
@@ -31,8 +35,25 @@ a {
     text-decoration: none;
     transition: all 0.2s ease;
     &:hover {
-      text-decoration: none;
+      text-decoration: none !important;
       background-color: rgba(38,80,132,0.6);
+    }
+    &.btn-two {
+      margin: 0 0 0 0.5em;
+      padding: 5px 10px;
+    }
+    &.btn-three {
+      margin: 0 0 0 0.5em;
+      padding: 2px 10px;
+    }
+    &.btn-four {
+      margin: 0 0 0 0.5em;
+      padding: 0px 10px;
+      background-color: transparent;
+      border: none;
+      &:hover {
+        text-decoration: underline !important;
+      }
     }
   }
 }
@@ -83,6 +104,35 @@ a {
   border: 1px solid #ddd;
   padding: 1em;
   border-radius: 8px;
+  &.w-title {
+    border-radius: 0px 0px 8px 8px;
+    flex-grow: 1;
+  }
+}
+.card-title {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2em;
+  font-weight: bold;
+  border-radius: 8px 8px 0px 0px;
+  padding: 10px;
+  color: #fff;
+  background-color: #000;
+}
+.mct { /* mini card text */
+  display: inline;
+  font-size: 0.8em;
+}
+li.hcli { /* homepage card li */ 
+  margin-left: 1em;
+  &:not(:last-child):not(:only-child) {
+    margin-bottom: 1em;
+  }
+}
+.hpc { /* homepage card */
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-card h2 {
@@ -93,7 +143,11 @@ a {
 
 .dashboard-line {
   margin-bottom: 0.5em;
+  &.due-next {
+    padding-left: 1em;
+  }
 }
+
 
 .dashboard-big {
   font-size: 2em;

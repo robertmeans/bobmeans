@@ -145,7 +145,7 @@ table {
   th, 
   td {
     font-weight: normal;
-    padding: 2px;
+    padding: 5px;
     text-align: left;
     &.pay {
       display: flex;
@@ -226,6 +226,10 @@ table {
   thead {
     background-color: #313131;
     color: #fff;
+    white-space: nowrap;
+    th {
+      padding: 5px;
+    }
   }
 }
 .billing-schedule.projection {

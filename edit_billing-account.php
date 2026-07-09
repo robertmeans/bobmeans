@@ -261,6 +261,12 @@ require '_includes/nav.php';
 <div class="intake-form">
   <div class="funding-form">
 
+    <div class="inner-links">
+      <a href="bill_details.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Bill Details</a> |
+      <a href="index.php">Dashboard</a> |
+      <a href="reserve_adjustment.php">Reserve Adjustment</a>
+    </div>
+
     <h1>Edit Billing Account</h1>
 
     <?php if ($errors): ?>
@@ -301,6 +307,12 @@ require '_includes/nav.php';
           >
         </div>
 
+
+
+
+
+
+
         <div class="two-col">
           <div class="row">
             <label for="cadence">Cadence</label>
@@ -316,6 +328,30 @@ require '_includes/nav.php';
             <input type="number" id="renewal_term_months" name="renewal_term_months" min="1" value="<?php echo htmlspecialchars((string)$renewal_term_months, ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
         </div>
+
+
+
+
+
+
+
+
+
+
+
+<?php if ($cadence === 'custom'): ?>
+  <div class="success" style="display:block; margin-top: 1em;">
+    This bill uses explicit scheduled due events.<br>
+    <a href="bill_details.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Manage custom due dates from Bill Details</a>
+  </div>
+<?php endif; ?>
+
+
+
+
+
+
+
 
         <div class="two-col">
 

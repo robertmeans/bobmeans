@@ -138,6 +138,7 @@ $projection_dashboard = projection_summary_for_all_accounts(
 
 $account_attention_list = $projection_dashboard['account_attention_list'];
 $next_uncovered_bill = $projection_dashboard['next_uncovered_bill'];
+$next_uncovered_bills_same_date = $projection_dashboard['next_uncovered_bills_same_date'] ?? [];
 $exceptions = array_slice($projection_dashboard['exceptions'], 0, 10);
 $monthly_needed_totals = $projection_dashboard['monthly_needed_totals'];
 $total_underfunded = $projection_dashboard['total_underfunded'];
@@ -201,6 +202,17 @@ require '_includes/nav.php';
     <div class="dashboard-grid">
 
 
+
+
+
+
+
+
+
+
+
+
+<?php /*
       <div class="dashboard-card">
         <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);">Today is: </span> <?php echo date('l, F jS'); ?></h2>
 
@@ -232,52 +244,114 @@ require '_includes/nav.php';
           <p>No uncovered bills found in the projection window.</p>
         <?php endif; ?>
       </div>
+*/ ?>
 
-      <div class="dashboard-card">
-        <h2>Next Due Per Funding Account</h2>
-        <?php if ($account_attention_list): ?>
-          <?php foreach ($account_attention_list as $item): ?>
+      <div class="hpc">
+        <div class="card-title">
+          Fund Next
+        </div>
+        <div class="dashboard-card w-title">
+
+          <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);">Today is: </span> <?php echo date('l, F jS'); ?></h2>
+
+          <?php if ($next_uncovered_bill): ?>
             <?php
-            $account_name = $item['account_name'];
-            $summary = $item['summary'];
+            $today = new DateTime('today');
+            $today->setTime(0, 0, 0);
+            $next_date = new DateTime($next_uncovered_bill['due_date']);
+            $next_date->setTime(0, 0, 0);
+            $days = (int)$today->diff($next_date)->format('%r%a');
             ?>
 
-          <div class="dashboard-line <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="dashboard-line">
+              <span style="font-size:2em;font-weight:700;"><?php echo $days; ?></span>
+              &nbsp;day<?php echo ($days === 1) ? '' : 's'; ?>
+              until <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
+            </div>
 
-            <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong>
+        <?php foreach ($next_uncovered_bills_same_date as $index => $item): ?>
+          <li class="hcli">
+            <?php  echo ($index === 0) ? '' : 'and'; ?>
+              <?php echo htmlspecialchars($item['funding_account'], ENT_QUOTES, 'UTF-8'); ?> will need $<?php echo number_format((float)$item['remaining_due'], 2); ?> 
+            for <?php echo htmlspecialchars($item['billing_name'], ENT_QUOTES, 'UTF-8'); ?> <div class="mct"> [<a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$item['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$item['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$item['billing_name']); ?>">add $<?php echo number_format((float)$item['remaining_due'], 2); ?></a>]</div>
+          </li>
+        <?php endforeach; ?>
 
-            <a class="account-jump" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">
-              <?php if ($summary['status'] === 'partial' || $summary['status'] === 'due'): ?>
-                <?php echo $summary['message']; ?>
-                 $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
-              <?php else: ?>
-                <?php echo $summary['message']; ?>
-              <?php endif; ?>
-            </a>
-          </div>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <p>No active billing accounts found.</p>
-        <?php endif; ?>
+          <?php else: ?>
+            <p>No uncovered bills found in the projection window.</p>
+          <?php endif; ?>
+        </div>
       </div>
 
-      <div class="dashboard-card">
-        <h2>Due by Month</h2>
-        <?php
 
-        $months_to_show = 4;
-        $monthly_needed_totals_display = array_slice($monthly_needed_totals, 0, $months_to_show, true);
 
-        if ($monthly_needed_totals): ?>
-          <?php foreach ($monthly_needed_totals_display as $month_key => $amount): ?>
-            <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
-              <strong><?php echo date('F', strtotime($month_key . '-01')); ?>:</strong>
-              $<?php echo number_format($amount, 2); ?>
-            </div>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <p>No projected shortfalls found.</p>
-        <?php endif; ?>
+
+      <div class="hpc">
+        <div class="card-title">
+          Next Up
+        </div>
+        <div class="dashboard-card w-title">
+          <?php if ($account_attention_list): ?>
+            <?php foreach ($account_attention_list as $item): ?>
+              <?php
+              $account_name = $item['account_name'];
+              $summary = $item['summary'];
+              ?>
+
+            <li class="hcli <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
+
+              <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong> next 
+
+              
+                <?php if ($summary['status'] === 'partial' || $summary['status'] === 'due'): ?>
+                  <?php echo $summary['message']; ?>
+                   $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
+                   <div class="mct">[<a class="account-jump" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">view projection</a>]</div>
+                <?php else: ?>
+                  <?php echo $summary['message']; ?>
+                <?php endif; ?>
+
+            </li>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <p>No active billing accounts found.</p>
+          <?php endif; ?>
+        </div>
+      </div>
+
+
+
+
+
+
+
+
+
+
+
+
+      <div class="hpc">
+        <div class="card-title">
+          Due by Month
+        </div>
+        <div class="dashboard-card w-title">
+          
+          <?php
+
+          $months_to_show = 4;
+          $monthly_needed_totals_display = array_slice($monthly_needed_totals, 0, $months_to_show, true);
+
+          if ($monthly_needed_totals): ?>
+            <?php foreach ($monthly_needed_totals_display as $month_key => $amount): ?>
+              <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
+                <strong><?php echo date('F', strtotime($month_key . '-01')); ?>:</strong>
+                $<?php echo number_format($amount, 2); ?>
+              </div>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <p>No projected shortfalls found.</p>
+          <?php endif; ?>
+        </div>
       </div>
 
     </div>
@@ -285,7 +359,7 @@ require '_includes/nav.php';
     <div class="dashboard-grid lower-grid">
 
       <div class="dashboard-card wide-card">
-        <h2>Next 10 Due</h2>
+        <h2>Next 10 Bills Due</h2>
 
         <?php if ($exceptions): ?>
           <table class="full-width">

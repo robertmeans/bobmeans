@@ -8,6 +8,20 @@ $user_id = $_SESSION['id'] ?? 1;
 $layout_context = 'projection';
 $selected_account = isset($_GET['account']) ? trim($_GET['account']) : 'PayPal';
 
+if (is_post_request() && isset($_POST['process_now'])) {
+  $process_billing_account_id = isset($_POST['billing_account_id']) ? (int)$_POST['billing_account_id'] : 0;
+  $process_due_date = trim($_POST['due_date'] ?? '');
+
+  if (
+    $process_billing_account_id > 0 &&
+    preg_match('/^\d{4}-\d{2}-\d{2}$/', $process_due_date)
+  ) {
+    process_bill_now($pdo_db, $user_id, $process_billing_account_id, $process_due_date);
+  }
+
+  redirect_to('billing_projection.php?account=' . urlencode($selected_account));
+}
+
 // $reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
 reconcile_due_bills_against_reserves($pdo_db, $user_id);
 
@@ -38,6 +52,19 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$stmt = $pdo_db->prepare("
+  SELECT
+    funding_account_id,
+    account_name,
+    login_url
+  FROM funding_accounts
+  WHERE user_id = ?
+    AND is_active = 1
+  ORDER BY account_name ASC
+");
+$stmt->execute([$user_id]);
+$funding_accounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 // $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $rows);
 $reserve_totals = funding_account_pool_totals($pdo_db, $user_id);
 
@@ -47,7 +74,16 @@ if (!isset($reserve_totals[$selected_account])) {
 }
 
 $projection_rows = filter_rows_by_funding_account($rows, $selected_account);
-// $pool_amount = combined_reserve_total_for_funding_account($pdo_db, $user_id, $rows, $selected_account);
+
+$funding_account_meta = [];
+
+foreach ($funding_accounts as $funding) {
+  $funding_account_meta[(string)$funding['account_name']] = [
+    'funding_account_id' => (int)$funding['funding_account_id'],
+    'login_url' => $funding['login_url'] ?? null
+  ];
+}
+
 $pool_amount = isset($reserve_totals[$selected_account]) ? (float)$reserve_totals[$selected_account] : 0.00;
 
 $months_ahead = 12;
@@ -61,8 +97,8 @@ require '_includes/nav.php';
 <div class="intake-form">
   <div class="billing-schedule projection">
 
-    <?php /* <h1>Billing Projection</h1> */ ?>
-
+   <?php /* <h1><?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?> Billing Projection</h1> */ ?>
+   <h1>Billing Projection</h1>
 
     <?php 
     /*  $single_fund_acct = determine whether there is more than 1 funding account
@@ -75,68 +111,84 @@ require '_includes/nav.php';
     } ?>
 
     <?php if ($single_fund_acct !== 'yes') { ?>
-      <form class="pro-acct" method="get" style="margin-bottom: 1em;">
-        <label for="account"><strong>Switch Projection Account:</strong></label>
-        <select id="account" name="account" onchange="this.form.submit()">
-          <?php foreach ($reserve_totals as $account_name => $amount): ?>
-            <option value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>" <?php echo ($selected_account === $account_name) ? 'selected' : ''; ?>>
-              <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-        <noscript><button type="submit">View</button></noscript>
-      </form>
-    <?php } ?>
 
-<?php /*
-      <?php if (!empty($reconciliation['processed_count']) || !empty($reconciliation['skipped_count'])): ?>
-        <div class="success" style="display:block;">
-          Processed: <?php echo (int)$reconciliation['processed_count']; ?>
-          <?php if (!empty($reconciliation['skipped_count'])): ?>
-            | Skipped: <?php echo (int)$reconciliation['skipped_count']; ?>
-          <?php endif; ?>
-        </div>
-      <?php endif; ?>
-*/ ?>
+      <?php foreach ($reserve_totals as $account_name => $amount): ?>
+        <?php
+        $meta = $funding_account_meta[$account_name] ?? null;
+        $funding_account_id = $meta['funding_account_id'] ?? null;
+        $login_url = $meta['login_url'] ?? null;
+        ?>
 
-      <div>
+        <?php if ($selected_account === $account_name) { ?>
+          <div class="selected-fund">
+            <i class="fas fa-star"></i>&nbsp; [selected]
 
-        <?php if ($single_fund_acct !== 'yes') { ?>
+            <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>
+            $<?php echo number_format($amount, 2); ?>
 
-        <?php foreach ($reserve_totals as $account_name => $amount): ?>
-          
-            <?php if ($selected_account === $account_name) { ?>
-              <div class="selected-fund">
-                <i class="fas fa-star"></i>&nbsp; [selected]
-                
-                <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> 
-                $<?php echo number_format($amount, 2); ?>
-                &nbsp;<i class="fas fa-star"></i>
-              </div>
-            <?php } else { ?>
-              <div>
-                <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> 
-                $<?php echo number_format($amount, 2); ?>
-              </div>
-           <?php } ?>
+            &nbsp;<i class="fas fa-star"></i>
 
-        <?php endforeach; ?>
+            <?php if (!empty($funding_account_id)): ?>
+              <a class="btn-three" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
+                Ledger
+              </a>
+            <?php endif; ?>
 
+            <?php if (!empty($login_url)): ?>
+              <a class="btn-three" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                Login
+              </a>
+            <?php endif; ?>
+          </div>
         <?php } else { ?>
+          <div class="other-fund">
+            <a class="btn-four" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">Switch to: <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> $<?php echo number_format($amount, 2); ?></a>
 
-              <div>
-                You only have 1 funding account. - <a href="intake_funding-accounts.php">Add another</a>
-              </div>
+            <?php if (!empty($funding_account_id)): ?>
+              <a class="btn-four" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
+                Ledger
+              </a>
+            <?php endif; ?>
 
+            <?php if (!empty($login_url)): ?>
+              <a class="btn-four" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                Login
+              </a>
+            <?php endif; ?>
+          </div>
         <?php } ?>
 
-        <div style="display: flex;margin: 0.5em 0 0.5em;">
-          <strong><?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?> Reserve Used In Projection:</strong>&nbsp; $<?php echo number_format($projection['starting_pool'], 2); ?>
-        </div>
+      <?php endforeach; ?>
 
+    <?php } else { ?>
+
+      <?php
+      $only_funding = !empty($funding_accounts) ? $funding_accounts[0] : null;
+      ?>
+
+      <div>
+        You only have 1 funding account.
+
+        <?php if ($only_funding): ?>
+          <?php if (!empty($only_funding['funding_account_id'])): ?>
+            <a class="btn-three" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$only_funding['funding_account_id']; ?>">
+              Ledger
+            </a>
+          <?php endif; ?>
+
+          <?php if (!empty($only_funding['login_url'])): ?>
+            <a class="btn-three" href="<?php echo htmlspecialchars((string)$only_funding['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+              Login
+            </a>
+          <?php endif; ?>
+        <?php endif; ?>
+
+        - <a class="btn-two" href="intake_funding-accounts.php">Add another</a>
       </div>
 
-    <div class="table-container">
+    <?php } ?>
+
+    <div class="table-container" style="margin-top: 0.5em;">
     <table>
       <thead>
         <tr>
@@ -147,6 +199,7 @@ require '_includes/nav.php';
           <th>Covered</th>
           <th>Remaining Due</th>
           <th>Pool Left</th>
+          <th>Process Now</th>
         </tr>
       </thead>
       <tbody>
@@ -174,9 +227,28 @@ require '_includes/nav.php';
         }
 
         $linked_first_uncovered = false; /* flag first partial or due for hyperlink in "Remaining Due" column */
+        // foreach ($projection['events'] as $index => $event): 
+        if (!empty($projection['events'])): ?>
+          <tr class="opening-balance-row">
+            <td colspan="6"><strong>Current <?php echo htmlspecialchars($selected_account, ENT_QUOTES, 'UTF-8'); ?> Balance</strong></td>
+            <td>$<?php echo number_format($pool_amount, 2); ?></td>
+            <td>&nbsp;</td>
+          </tr>
+        <?php endif; ?>
+
+        <?php 
+        $seen_bill_ids = [];
         foreach ($projection['events'] as $index => $event): 
 
         $row_classes = [$event['status']];
+
+        $billing_account_id = (int)$event['billing_account_id'];
+        $is_first_occurrence_for_bill = !in_array($billing_account_id, $seen_bill_ids, true);
+
+        if ($is_first_occurrence_for_bill) {
+          $seen_bill_ids[] = $billing_account_id;
+        }
+
 
         if ($attention_index !== null && $index === $attention_index) {
           $row_classes[] = $attention_class;
@@ -187,7 +259,7 @@ require '_includes/nav.php';
 
 
           <td>
-            <a class="editAcctLink" href="bill_details.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
+            <a href="bill_details.php?billing_account_id=<?php echo (int)$event['billing_account_id']; ?>"><?php echo htmlspecialchars($event['billing_name'], ENT_QUOTES, 'UTF-8'); ?></a>
 
             <?php if (false): ?>
                 <?php if ($event['vendor_name'] !== ''): ?>
@@ -239,6 +311,38 @@ require '_includes/nav.php';
           </td>
 
           <td>$<?php echo number_format((float)$event['pool_remaining_after'], 2); ?></td>
+
+          <td>
+            <?php
+            $can_process_now =
+              ((string)$event['status'] === 'covered' || (string)$event['status'] === 'partial' || (string)$event['status'] === 'due') &&
+              !empty($event['billing_account_id']) &&
+              !empty($event['due_date']) &&
+              empty($event['already_paid']);
+            ?>
+
+            <?php if ($is_first_occurrence_for_bill): ?>
+              <form method="post" class="process-now-form" style="margin:0;">
+                <input type="hidden" name="process_now" value="1">
+                <input type="hidden" name="billing_account_id" value="<?php echo (int)$event['billing_account_id']; ?>">
+                <input type="hidden" name="due_date" value="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>">
+
+                <button
+                  type="button"
+                  class="postnow-btn process-now-trigger"
+                  data-bill-name="<?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>"
+                  data-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-amount="<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
+                >
+                  Process Now
+                </button>
+              </form>
+            <?php else: ?>
+              &nbsp;
+            <?php endif; ?>
+          </td>
+
         </tr>
       <?php endforeach; ?>
 
@@ -246,13 +350,55 @@ require '_includes/nav.php';
     </table>
     </div>
 
+    <?php /* grab the currently selected funding accounts ID to use in Reserve Adjustment link below */
+    $current_funding_account_id = null;
+
+    if (!empty($funding_account_meta[$selected_account])) {
+      $current_funding_account_id = (int)$funding_account_meta[$selected_account]['funding_account_id'];
+    }
+    ?>
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
-      <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
+      <a href="reserve_adjustment.php<?php echo !empty($current_funding_account_id) ? '?funding_account_id=' . (int)$current_funding_account_id : ''; ?>">Reserve Adjustment</a> | 
       <a href="intake_funding-accounts.php">Add New Funding</a>
     </div>
 
   </div>
 </div>
+
+<div id="process-now-modal" class="confirm-modal" aria-hidden="true">
+  <div class="confirm-modal__backdrop"></div>
+
+  <div class="confirm-modal__panel" role="dialog" aria-modal="true" aria-labelledby="process-now-title">
+    <button type="button" class="confirm-modal__close" id="process-now-close" aria-label="Close">
+      &times;
+    </button>
+
+    <div class="confirm-modal__icon">!</div>
+
+    <h2 id="process-now-title">Process Bill Now?</h2>
+
+    <p class="confirm-modal__lead">
+      You’re about to manually process <strong id="modal-bill-name">this bill</strong>.
+    </p>
+
+    <div class="confirm-modal__details">
+      <div><span>Funding Account:</span> <strong id="modal-account-name"></strong></div>
+      <div><span>Amount:</span> <strong>$<span id="modal-amount"></span></strong></div>
+      <div><span>Scheduled Due Date:</span> <strong id="modal-due-date"></strong></div>
+    </div>
+
+    <p class="confirm-modal__note">
+      This will deduct funds now, record a payment, and advance the bill.
+    </p>
+
+    <div class="confirm-modal__actions">
+      <button type="button" class="btn-two" id="process-now-cancel">Cancel</button>
+      <button type="button" class="btn-three confirm-modal__confirm" id="process-now-confirm">Yes, Process Now</button>
+    </div>
+  </div>
+</div>
+
+
 
 <?php require '_includes/footer.php'; ?>

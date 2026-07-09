@@ -5,3 +5,53 @@
   padding: 0.5em;
   background-color: rgba(255,255,255,0.2);
 }
+.other-fund {
+  padding: 0.25em 0.5em;
+}
+.diff-bgc {
+  background-color: rgba(0,0,0,0.1);
+  margin: 1em 0;
+}
+.custom-due-event {
+  display: flex;
+  flex-direction: column;
+}
+table {
+    tr.startingbal td {
+    font-weight: bold;
+  }
+}
+.opening-balance-row td {
+  // font-weight: 700;
+  padding: 5px;
+  color: #fff;
+  background: #8a8a8a;
+  &:first-child {
+    letter-spacing: 1px;
+  }
+}
+form.process-now-form {
+  display: flex;
+  // justify-content: center;
+  align-items: flex-start;
+
+}
+button.postnow-btn {
+  all: unset;
+  cursor: pointer;
+  color: blue;
+  font-size: 0.9em;
+  // stext-align: center;
+  &:hover {
+    color: green;
+  }
+}
+.btn-two,
+.btn-three {
+  color: #fff;
+}
+.confirm-modal__close {
+  &:hover {
+    background-color: inherit;
+  }
+}

@@ -1,0 +1,110 @@
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 9999;
+}
+
+.confirm-modal.is-open {
+  display: block;
+}
+
+.confirm-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.confirm-modal__panel {
+  position: relative;
+  width: min(92vw, 520px);
+  margin: 8vh auto 0;
+  background: #fff;
+  border-radius: 18px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+  animation: modalPop 180ms ease-out;
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.confirm-modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.75rem;
+  border: 0;
+  background: transparent;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: rgba(0,0,0,0.45);
+}
+
+.confirm-modal__close:hover {
+  color: rgba(0,0,0,0.75);
+}
+
+.confirm-modal__icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 0.75rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  background: rgba(0,0,0,0.06);
+}
+
+.confirm-modal h2 {
+  margin: 0 0 0.6rem;
+}
+
+.confirm-modal__lead {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.confirm-modal__details {
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(0,0,0,0.02);
+}
+
+.confirm-modal__details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.22rem 0;
+}
+
+.confirm-modal__details span {
+  color: rgba(0,0,0,0.65);
+}
+
+.confirm-modal__note {
+  margin: 0 0 1.2rem;
+  color: rgba(0,0,0,0.72);
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.confirm-modal__confirm {
+  min-width: 150px;
+}

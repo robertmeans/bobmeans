@@ -118,13 +118,13 @@ require '_includes/nav.php';
         </form>
       <?php endif; ?>
     <?php } else { ?>
-      You only have 1 funding account.
+      <p>You only have 1 funding account. - <a class="btn-two" href="intake_funding-accounts.php">Add another</a></p>
     <?php } ?>
 
     <?php if ($funding_account): ?>
       <div class="success" style="display:block;">
 
-        <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong><br>
+        <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong> | <a href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a><br>
         Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
 
         <br><a href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">
@@ -193,14 +193,21 @@ require '_includes/nav.php';
 
                 <td><?php echo htmlspecialchars((string)$row['sub_type'], ENT_QUOTES, 'UTF-8'); ?></td>
 
-                <td>
+
+
+                <td <?php if ((float)$row['signed_amount'] < 0) { echo 'class="ded-red"'; } ?>>
                   <?php
                   $sign = ((float)$row['signed_amount'] < 0) ? '-' : '+';
                   echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2);
                   ?>
                 </td>
 
-                <td>$<?php echo number_format((float)$row['running_balance'], 2); ?></td>
+                <td <?php if ((float)$row['running_balance'] < 0) { echo 'class="ded-red"'; } ?>>$<?php echo number_format((float)$row['running_balance'], 2); ?></td>
+
+
+
+
+
 
                 <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
 
@@ -222,7 +229,7 @@ require '_includes/nav.php';
       <div class="inner-links">
         <a href="index.php">Dashboard</a> |
         <a href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a> | 
-        <a href="reserve_adjustment.php">Reserve Adjustment</a> |
+        <a href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">Reserve Adjustment</a> |
         <a href="funding_accounts.php">Funding Accounts</a>
         
       </div>

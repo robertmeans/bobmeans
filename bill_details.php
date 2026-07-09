@@ -119,6 +119,12 @@ if (!empty($bill['default_funding_account_id'])) {
   );
 }
 
+$custom_due_events = [];
+
+if (!empty($bill['cadence']) && $bill['cadence'] === 'custom') {
+  $custom_due_events = upcoming_bill_due_schedule($pdo_db, $billing_account_id, $user_id, 24);
+}
+
 $bill_activity = bill_activity_timeline($pdo_db, $user_id, $billing_account_id);
 $scheduled_amounts = upcoming_bill_amount_schedule($pdo_db, $billing_account_id, $user_id, 12);
 
@@ -128,6 +134,13 @@ require '_includes/nav.php';
 
 <div class="intake-form">
   <div class="billing-schedule">
+
+      <div class="inner-links">
+        <a href="index.php">Dashboard</a> |
+        <a href="billing_projection.php">Projection</a> |
+        <a href="reserve_adjustment.php">Reserve Adjustment</a>
+      </div>
+
 
     <h1>Bill Details</h1>
 
@@ -282,11 +295,10 @@ require '_includes/nav.php';
       <?php endif; ?>
 
 
-
       <h2>Scheduled Amounts</h2>
       
       <div class="inner-links">
-        <a href="add_bill_amount_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Scheduled Amount</a>
+        <a class="btn-one" href="add_bill_amount_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Scheduled Amount</a>
       </div>
 
       <?php if ($scheduled_amounts): ?>
@@ -311,6 +323,49 @@ require '_includes/nav.php';
       <?php else: ?>
         <p>No scheduled amount overrides yet.</p>
       <?php endif; ?>
+
+
+
+
+
+
+
+
+      <div class="diff-bgc">
+        <?php if ((string)$bill['cadence'] === 'custom'): ?>
+          <h2>Scheduled Due Events</h2>
+
+          <div class="inner-links">
+            <a href="add_bill_due_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Due Event</a>
+          </div>
+
+          <?php if ($custom_due_events): ?>
+            <table class="full-width">
+              <thead>
+                <tr>
+                  <th>Due Date</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($custom_due_events as $row): ?>
+                  <tr>
+                    <td><?php echo date('m.d.y', strtotime((string)$row['due_date'])); ?></td>
+                    <td>$<?php echo number_format((float)$row['amount'], 2); ?></td>
+                    <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          <?php else: ?>
+            <p>No scheduled due events yet.</p>
+          <?php endif; ?>
+        <?php endif; ?>
+      </div>
+
+
+
 
 
       <h2>General Notes</h2>
