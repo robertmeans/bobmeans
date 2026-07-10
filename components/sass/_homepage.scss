@@ -125,12 +125,27 @@ a {
   font-size: 0.8em;
   margin-top: -4px;
   vertical-align: top;
+  &.nu {
+    margin-top: -1.25em;
+  }
 }
 li.hcli { /* homepage card li */ 
   margin-left: 1em;
   &:not(:last-child):not(:only-child) {
     margin-bottom: 1em;
   }
+}
+
+.vstd {
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.2);
+  border-radius: 10px;
+  margin: 0 0 10px 0;
+}
+
+
+.hcul { /* homepage card ul */
+  margin-top: 0;
 }
 .hpc { /* homepage card */
   display: flex;

@@ -937,7 +937,6 @@ function projection_summary_for_account(
 
     $first_problem_summary = [
       'status' => $next_uncovered_event['status'],
-      // 'message' => date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_event['due_date'])) . ' <span style="font-size:0.8em;display:inline-block;position:relative;top:-3px;margin:0 5px;">●</span> ' . $next_uncovered_event['billing_name'],
       'message' => '<strong>' . $next_uncovered_event['status'] . '</strong> ' . date('M j', strtotime($next_uncovered_event['due_date'])) . ' - ',
       'remaining_due' => (float)$next_uncovered_event['remaining_due'],
       'due_date' => $next_uncovered_event['due_date']
@@ -990,20 +989,28 @@ function projection_summary_for_all_accounts(
 
     $account_summaries[$account_name] = $summary;
 
-    if ($summary['next_uncovered_event'] !== null) {
-      $next_uncovered_candidates[] = array_merge(
-        $summary['next_uncovered_event'],
-        ['funding_account' => $account_name]
-      );
-    }
+    foreach (($summary['projection']['events'] ?? []) as $event) {
+      $status = (string)($event['status'] ?? '');
+      $remaining_due = round((float)($event['remaining_due'] ?? 0), 2);
 
-    foreach ($summary['projection']['events'] as $event) {
-      if ($event['status'] === 'partial' || $event['status'] === 'due') {
-        $exceptions[] = array_merge($event, [
-          'funding_account' => $account_name
-        ]);
-        $total_underfunded += (float)$event['remaining_due'];
+      if (
+        !in_array($status, ['partial', 'due'], true) ||
+        $remaining_due <= 0
+      ) {
+        continue;
       }
+
+      $uncovered_event = array_merge(
+        $event,
+        [
+          'funding_account' => (string)$account_name,
+          'remaining_due' => $remaining_due
+        ]
+      );
+
+      $next_uncovered_candidates[] = $uncovered_event;
+      $exceptions[] = $uncovered_event;
+      $total_underfunded += $remaining_due;
     }
 
     foreach ($summary['monthly_needed_totals'] as $month_key => $amount) {
@@ -1029,10 +1036,25 @@ function projection_summary_for_all_accounts(
 
   usort($next_uncovered_candidates, function ($a, $b) {
     if ($a['due_date'] === $b['due_date']) {
-      return strcmp((string)$a['billing_name'], (string)$b['billing_name']);
+      $account_compare = strcmp(
+        (string)$a['funding_account'],
+        (string)$b['funding_account']
+      );
+
+      if ($account_compare !== 0) {
+        return $account_compare;
+      }
+
+      return strcmp(
+        (string)$a['billing_name'],
+        (string)$b['billing_name']
+      );
     }
 
-    return strcmp((string)$a['due_date'], (string)$b['due_date']);
+    return strcmp(
+      (string)$a['due_date'],
+      (string)$b['due_date']
+    );
   });
 
   $account_attention_list = [];
@@ -1063,21 +1085,19 @@ function projection_summary_for_all_accounts(
     return strcmp($date_a, $date_b);
   });
 
-
-
   $next_uncovered_bill = null;
   $next_uncovered_bills_same_date = [];
 
-  if (!empty($next_uncovered_candidates)) {
+  if ($next_uncovered_candidates) {
     $next_uncovered_bill = $next_uncovered_candidates[0];
-    $first_due_date = $next_uncovered_bill['due_date'];
+    $earliest_due_date = (string)$next_uncovered_bill['due_date'];
 
     foreach ($next_uncovered_candidates as $candidate) {
-      if ((string)$candidate['due_date'] === (string)$first_due_date) {
-        $next_uncovered_bills_same_date[] = $candidate;
-      } else {
+      if ((string)$candidate['due_date'] !== $earliest_due_date) {
         break;
       }
+
+      $next_uncovered_bills_same_date[] = $candidate;
     }
   }
 

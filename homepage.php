@@ -73,7 +73,6 @@ function homepage_base_amount(array $row): float
 
 // $reserve_totals = combined_reserve_totals_by_funding_account($pdo_db, $user_id, $billing_rows);
 $reserve_totals = funding_account_pool_totals($pdo_db, $user_id);
-
 $recent_bill_activity = recent_bill_activity($pdo_db, $user_id, 5);
 
 /*
@@ -143,6 +142,26 @@ $exceptions = array_slice($projection_dashboard['exceptions'], 0, 10);
 $monthly_needed_totals = $projection_dashboard['monthly_needed_totals'];
 $total_underfunded = $projection_dashboard['total_underfunded'];
 
+$next_up_groups = [];
+
+foreach ($next_uncovered_bills_same_date as $item) {
+  $funding_account_id = (int)$item['default_funding_account_id'];
+
+  if (!isset($next_up_groups[$funding_account_id])) {
+    $next_up_groups[$funding_account_id] = [
+      'funding_account_id' => $funding_account_id,
+      'funding_account' => (string)$item['funding_account'],
+      'total_remaining_due' => 0.00,
+      'bills' => []
+    ];
+  }
+
+  $next_up_groups[$funding_account_id]['total_remaining_due'] +=
+    (float)$item['remaining_due'];
+
+  $next_up_groups[$funding_account_id]['bills'][] = $item;
+}
+
 /* funding account / reserve activity */
 $stmt = $pdo_db->prepare("
   SELECT
@@ -201,58 +220,13 @@ require '_includes/nav.php';
 
     <div class="dashboard-grid">
 
-
-
-
-
-
-
-
-
-
-
-
-<?php /*
-      <div class="dashboard-card">
-        <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);">Today is: </span> <?php echo date('l, F jS'); ?></h2>
-
-        <?php if ($next_uncovered_bill): ?>
-          <?php
-          $today = new DateTime('today');
-          $today->setTime(0, 0, 0);
-          $next_date = new DateTime($next_uncovered_bill['due_date']);
-          $next_date->setTime(0, 0, 0);
-          $days = (int)$today->diff($next_date)->format('%r%a');
-          ?>
-          <div class="dashboard-line">
-            <span style="font-size:2em;font-weight:700;"><?php echo $days; ?></span> &nbsp;day<?php echo ($days === 1) ? '' : 's'; ?> 'til <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
-            
-          </div>
-
-          <div class="dashboard-line">
-            When
-            <a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$next_uncovered_bill['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$next_uncovered_bill['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$next_uncovered_bill['billing_name']); ?>">
-              <?php echo htmlspecialchars($next_uncovered_bill['funding_account'], ENT_QUOTES, 'UTF-8'); ?> needs $<?php echo number_format((float)$next_uncovered_bill['remaining_due'], 2); ?>
-            </a>
-          </div>
-
-          <div class="dashboard-line">
-             To cover <?php echo htmlspecialchars($next_uncovered_bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
-          </div>
-
-        <?php else: ?>
-          <p>No uncovered bills found in the projection window.</p>
-        <?php endif; ?>
-      </div>
-*/ ?>
-
       <div class="hpc">
         <div class="card-title">
           Next Up
         </div>
         <div class="dashboard-card w-title">
 
-          <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);">Today is: </span> <?php echo date('l, F jS'); ?></h2>
+          <h2><span style="font-size:0.7em;color:rgba(0,0,0,0.6);margin-right:6px;font-weight:500;">Today is:</span><?php echo date('l, F jS'); ?></h2>
 
           <?php if ($next_uncovered_bill): ?>
             <?php
@@ -269,22 +243,60 @@ require '_includes/nav.php';
               until <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
             </div>
 
-        <?php foreach ($next_uncovered_bills_same_date as $index => $item): ?>
-          <li class="hcli">
-            <?php  echo ($index === 0) ? '' : 'and'; ?>
-              <?php echo htmlspecialchars($item['funding_account'], ENT_QUOTES, 'UTF-8'); ?> will need $<?php echo number_format((float)$item['remaining_due'], 2); ?> 
-            for <?php echo htmlspecialchars($item['billing_name'], ENT_QUOTES, 'UTF-8'); ?> <div class="mct"><a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$item['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$item['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$item['billing_name']); ?>">add $<?php echo number_format((float)$item['remaining_due'], 2); ?></a> | <a href="billing_projection.php?account=<?php echo urlencode($item['funding_account']); ?>">view projection</a></div>
-          </li>
-        <?php endforeach; ?>
+            <?php $multiple_funding_accounts = count($next_up_groups) > 1; ?>
+            <?php foreach (array_values($next_up_groups) as $index => $group): ?>
+              <?php
+              $total_needed = round((float)$group['total_remaining_due'], 2);
+
+              $bill_names = array_map(
+                static fn($bill) => (string)$bill['billing_name'],
+                $group['bills']
+              );
+              ?>
+
+              <div class="next-up-group<?php echo $multiple_funding_accounts ? ' vstd' : ''; ?>">
+                <?php echo ($index === 0) ? '' : 'and '; ?>
+
+                <?php echo htmlspecialchars($group['funding_account'], ENT_QUOTES, 'UTF-8'); ?>
+                will need $<?php echo number_format($total_needed, 2); ?>
+
+                <ul class="hcul">
+                  <?php foreach ($group['bills'] as $bill): ?>
+                    <li>
+                      $<?php echo number_format((float)$bill['remaining_due'], 2); ?>
+                      for
+                      <?php echo htmlspecialchars($bill['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+
+                <div class="mct nu">
+                  <a href="reserve_adjustment.php?funding_account_id=<?php
+                    echo (int)$group['funding_account_id'];
+                  ?>&amount=<?php
+                    echo urlencode(number_format($total_needed, 2, '.', ''));
+                  ?>&bill=<?php
+                    echo urlencode(implode(', ', $bill_names));
+                  ?>">
+                    add $<?php echo number_format($total_needed, 2); ?>
+                  </a>
+
+                  |
+
+                  <a href="billing_projection.php?account=<?php
+                    echo urlencode($group['funding_account']);
+                  ?>">
+                    view projection
+                  </a>
+                </div>
+              </div>
+            <?php endforeach; ?>
 
           <?php else: ?>
             <p>No uncovered bills found in the projection window.</p>
           <?php endif; ?>
         </div>
       </div>
-
-
-
 
       <div class="hpc">
         <div class="card-title">
