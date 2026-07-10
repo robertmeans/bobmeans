@@ -12,6 +12,7 @@ $success = '';
 $account_name = '';
 $account_nickname = '';
 $login_url = '';
+$opening_balance = '';
 $account_type = 'other';
 $is_active = 1;
 
@@ -19,6 +20,7 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
   $account_name = trim($_POST['account_name'] ?? '');
   $account_nickname = trim($_POST['account_nickname'] ?? '');
   $login_url = trim($_POST['login_url'] ?? '');
+  $opening_balance = str_replace(',', '', trim($_POST['opening_balance'] ?? ''));
   $account_type = trim($_POST['account_type'] ?? 'other');
   $is_active = isset($_POST['is_active']) ? 1 : 0;
 
@@ -29,6 +31,10 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
   if ($login_url !== '' && !filter_var($login_url, FILTER_VALIDATE_URL)) {
     $errors[] = 'Login URL must be a valid URL.';
   }
+
+  if ($opening_balance !== '' && (!is_numeric($opening_balance) || (float)$opening_balance < 0)) {
+    $errors[] = 'Opening Balance must be 0 or greater.';
+  } 
 
   if (!in_array($account_type, ['checking', 'credit_card', 'paypal', 'savings', 'other'], true)) {
     $errors[] = 'Account type is invalid.';
@@ -70,6 +76,31 @@ if (is_post_request() && isset($_POST['create_funding_account'])) {
       $is_active
     ]);
 
+    $new_funding_account_id = (int)$pdo_db->lastInsertId();
+
+    if ($opening_balance !== '' && (float)$opening_balance > 0) {
+      $stmt = $pdo_db->prepare("
+        INSERT INTO funding_account_reserve_transactions (
+          funding_account_id,
+          user_id,
+          billing_account_id,
+          transaction_type,
+          amount,
+          transaction_date,
+          note
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ");
+      $stmt->execute([
+        $new_funding_account_id,
+        $user_id,
+        null,
+        'contribution',
+        (float)$opening_balance,
+        date('Y-m-d H:i:s'),
+        'Opening balance entered at account creation'
+      ]);
+    }
+
     $success = 'Funding account added.';
 
     $account_name = '';
@@ -87,74 +118,85 @@ require '_includes/nav.php';
 <div class="intake-form">
   <div class="funding-form">
 
-  <h1>Add Funding Account</h1>
+    <h1>Add Funding Account</h1>
 
-  <?php if ($errors): ?>
-    <div class="errors">
-      <ul>
-        <?php foreach ($errors as $error): ?>
-          <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
-        <?php endforeach; ?>
-      </ul>
-    </div>
-  <?php endif; ?>
+    <?php if ($errors): ?>
+      <div class="errors">
+        <ul>
+          <?php foreach ($errors as $error): ?>
+            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+          <?php endforeach; ?>
+        </ul>
+      </div>
+    <?php endif; ?>
 
-  <?php if ($success !== ''): ?>
-    <div class="success"><?php echo htmlspecialchars($success, ENT_QUOTES, 'UTF-8'); ?></div>
-  <?php endif; ?>
+    <?php if ($success !== ''): ?>
+      <div class="success"><?php echo htmlspecialchars($success, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
 
+    <form method="post">
+      <input type="hidden" name="create_funding_account" value="1">
 
-  <form method="post">
-    <input type="hidden" name="create_funding_account" value="1">
+      <div class="two-col">
+        <div class="row">
+          <label for="account_name">Account Name</label>
+          <input
+            type="text"
+            id="account_name"
+            name="account_name"
+            value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>"
+            required
+          >
+        </div>
 
-    <div class="two-col">
-      <div class="row">
-        <label for="account_name">Account Name</label>
+        <div class="row">
+          <label for="account_nickname">Nickname</label>
+          <input
+            type="text"
+            id="account_nickname"
+            name="account_nickname"
+            value="<?php echo htmlspecialchars($account_nickname, ENT_QUOTES, 'UTF-8'); ?>"
+          >
+        </div>
+      </div>
+
+      <div class="row standalone">
+        <label for="login_url">Login URL</label>
         <input
-          type="text"
-          id="account_name"
-          name="account_name"
-          value="<?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>"
-          required
+          type="url"
+          id="login_url"
+          name="login_url"
+          value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
+          placeholder="https://example.com/login"
         >
       </div>
 
-      <div class="row">
-        <label for="account_nickname">Nickname</label>
-        <input
-          type="text"
-          id="account_nickname"
-          name="account_nickname"
-          value="<?php echo htmlspecialchars($account_nickname, ENT_QUOTES, 'UTF-8'); ?>"
-        >
-      </div>
-    </div>
+      <div class="two-col">
+        <div class="row">
+          <label for="opening_balance">Opening Balance</label>
+          <input
+            type="text"
+            id="opening_balance"
+            name="opening_balance"
+            value="<?php echo htmlspecialchars($opening_balance, ENT_QUOTES, 'UTF-8'); ?>"
+            placeholder="0.00"
+          >
+        </div>
 
-    <div class="row standalone">
-      <label for="login_url">Login URL</label>
-      <input
-        type="url"
-        id="login_url"
-        name="login_url"
-        value="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>"
-        placeholder="https://example.com/login"
-      >
-    </div>
+        <div class="row">
+          <label for="account_type">Account Type</label>
+          <select id="account_type" name="account_type">
+            <option value="checking" <?php echo ($account_type === 'checking') ? 'selected' : ''; ?>>Checking</option>
+            <option value="credit_card" <?php echo ($account_type === 'credit_card') ? 'selected' : ''; ?>>Credit Card</option>
+            <option value="paypal" <?php echo ($account_type === 'paypal') ? 'selected' : ''; ?>>PayPal</option>
+            <option value="savings" <?php echo ($account_type === 'savings') ? 'selected' : ''; ?>>Savings</option>
+            <option value="other" <?php echo ($account_type === 'other') ? 'selected' : ''; ?>>Other</option>
+          </select>
+        </div>
 
-    <div class="two-col">
-      <div class="row">
-        <label for="account_type">Account Type</label>
-        <select id="account_type" name="account_type">
-          <option value="checking" <?php echo ($account_type === 'checking') ? 'selected' : ''; ?>>Checking</option>
-          <option value="credit_card" <?php echo ($account_type === 'credit_card') ? 'selected' : ''; ?>>Credit Card</option>
-          <option value="paypal" <?php echo ($account_type === 'paypal') ? 'selected' : ''; ?>>PayPal</option>
-          <option value="savings" <?php echo ($account_type === 'savings') ? 'selected' : ''; ?>>Savings</option>
-          <option value="other" <?php echo ($account_type === 'other') ? 'selected' : ''; ?>>Other</option>
-        </select>
       </div>
 
-      <div class="row">
-        <label>&nbsp;</label>
+      <div class="row standalone">
         <div class="checks">
           <label>
             <input type="checkbox" name="is_active" value="1" <?php echo $is_active ? 'checked' : ''; ?>>
@@ -162,11 +204,9 @@ require '_includes/nav.php';
           </label>
         </div>
       </div>
-    </div>
 
-    <button type="submit">Add Funding Account</button>
-  </form>
-
+      <button type="submit">Add Funding Account</button>
+    </form>
 
     <div class="inner-links">
       <a href="index.php">Dashboard</a> | <a href="billing_projection.php">Projection</a>
@@ -174,7 +214,5 @@ require '_includes/nav.php';
 
   </div>
 </div>
-
-
 
 <?php require '_includes/footer.php'; ?>

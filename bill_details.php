@@ -126,6 +126,18 @@ if (!empty($bill['cadence']) && $bill['cadence'] === 'custom') {
 }
 
 $bill_activity = bill_activity_timeline($pdo_db, $user_id, $billing_account_id);
+
+
+// usort($bill_activity, function ($a, $b) {
+//   if ($a['event_datetime'] === $b['event_datetime']) {
+//     return strcmp((string)$a['label'], (string)$b['label']);
+//   }
+
+//   return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
+// });
+
+
+
 $scheduled_amounts = upcoming_bill_amount_schedule($pdo_db, $billing_account_id, $user_id, 12);
 
 require '_includes/header.php';
@@ -222,47 +234,103 @@ require '_includes/nav.php';
                 <td>
                   <?php
                   echo !empty($row['event_datetime'])
-                    ? date("m.d.y \\a\\t H:i", strtotime($row['event_datetime']))
+                    ? date("m.d.y", strtotime($row['event_datetime']))
                     : '';
                   ?>
                 </td>
 
                 <td>
-                  <?php if ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
-                    Payment Adjusted
-                  <?php elseif ($row['event_source'] === 'activity'): ?>
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['label'])), ENT_QUOTES, 'UTF-8'); ?>
-                  <?php else: ?>
+                  <?php if ($row['event_source'] === 'payment'): ?>
                     Payment
+
+                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
+                    Payment Adjustment
+
+                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'created'): ?>
+                    Created
+
+                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'updated'): ?>
+                    Edit
+
+                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'archived'): ?>
+                    Archived
+
+                  <?php elseif ($row['event_source'] === 'activity'): ?>
+                    Activity
+
+                  <?php else: ?>
+                    &nbsp;
                   <?php endif; ?>
                 </td>
 
                 <td>
                   <?php if ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
-                    Payment adjusted from
                     $<?php echo number_format((float)$row['old_value'], 2); ?>
-                    to
+                    &rarr;
                     $<?php echo number_format((float)$row['new_value'], 2); ?>
 
                   <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'created'): ?>
                     Billing account created
 
-                  <?php elseif ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
-                    <?php echo htmlspecialchars((string)$row['field_name'], ENT_QUOTES, 'UTF-8'); ?>
-                    changed from
-                    "<?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>"
-                    to
-                    "<?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>"
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'default_amount'): ?>
+                    Amount due:
+                    $<?php echo number_format((float)$row['old_value'], 2); ?>
+                    &rarr;
+                    $<?php echo number_format((float)$row['new_value'], 2); ?>
 
-                  <?php elseif ($row['event_source'] === 'activity'): ?>
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['label'])), ENT_QUOTES, 'UTF-8'); ?>
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'actual_due_date'): ?>
+                    Next calendar due date:
+                    <?php echo !empty($row['old_value']) ? date('m.d.y', strtotime((string)$row['old_value'])) : '—'; ?>
+                    &rarr;
+                    <?php echo !empty($row['new_value']) ? date('m.d.y', strtotime((string)$row['new_value'])) : '—'; ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'default_funding_account_id'): ?>
+                    Paid From Account
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'login_url'): ?>
+                    Login URL
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'vendor_name'): ?>
+                    Vendor name
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'billing_name'): ?>
+                    Billing account name
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'cadence'): ?>
+                    Cadence:
+                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
+                    &rarr;
+                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'due_day_of_month'): ?>
+                    Due day:
+                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
+                    &rarr;
+                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'due_month_of_year'): ?>
+                    Due month:
+                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
+                    &rarr;
+                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'reserve_style'): ?>
+                    Reserve style:
+                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['old_value'])), ENT_QUOTES, 'UTF-8'); ?>
+                    &rarr;
+                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['new_value'])), ENT_QUOTES, 'UTF-8'); ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'is_active'): ?>
+                    Status:
+                    <?php echo ((string)$row['new_value'] === '1') ? 'Active' : 'Archived'; ?>
+
+                  <?php elseif ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
+                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['field_name'])), ENT_QUOTES, 'UTF-8'); ?>
 
                   <?php else: ?>
                     Payment recorded
                   <?php endif; ?>
                 </td>
-
-
 
                 <td>
                   <?php if ($row['amount'] !== null): ?>
@@ -294,7 +362,6 @@ require '_includes/nav.php';
         <p>No activity recorded yet.</p>
       <?php endif; ?>
 
-
       <h2>Scheduled Amounts</h2>
       
       <div class="inner-links">
@@ -323,13 +390,6 @@ require '_includes/nav.php';
       <?php else: ?>
         <p>No scheduled amount overrides yet.</p>
       <?php endif; ?>
-
-
-
-
-
-
-
 
       <div class="diff-bgc">
         <?php if ((string)$bill['cadence'] === 'custom'): ?>
@@ -363,10 +423,6 @@ require '_includes/nav.php';
           <?php endif; ?>
         <?php endif; ?>
       </div>
-
-
-
-
 
       <h2>General Notes</h2>
 

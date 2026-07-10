@@ -121,8 +121,10 @@ a {
   background-color: #000;
 }
 .mct { /* mini card text */
-  display: inline;
+  display: block;
   font-size: 0.8em;
+  margin-top: -4px;
+  vertical-align: top;
 }
 li.hcli { /* homepage card li */ 
   margin-left: 1em;

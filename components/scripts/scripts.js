@@ -290,25 +290,64 @@ document.addEventListener('DOMContentLoaded', function () {
 /* modals */
 document.addEventListener('DOMContentLoaded', function () {
   const modal = document.getElementById('process-now-modal');
+  const panel = modal ? modal.querySelector('.confirm-modal__panel') : null;
   const closeBtn = document.getElementById('process-now-close');
   const cancelBtn = document.getElementById('process-now-cancel');
   const confirmBtn = document.getElementById('process-now-confirm');
   const backdrop = modal ? modal.querySelector('.confirm-modal__backdrop') : null;
 
+  const titleEl = document.getElementById('process-now-title');
   const billNameEl = document.getElementById('modal-bill-name');
   const dueDateEl = document.getElementById('modal-due-date');
   const amountEl = document.getElementById('modal-amount');
   const accountEl = document.getElementById('modal-account-name');
+  const earlyWarningEl = document.getElementById('modal-early-warning');
+  const errorEl = document.getElementById('process-now-error');
 
   let activeForm = null;
 
   function openModal(trigger, form) {
     activeForm = form;
 
+    const isEarly = trigger.dataset.isEarly === '1';
+
     billNameEl.textContent = trigger.dataset.billName || '';
     dueDateEl.textContent = trigger.dataset.dueDate || '';
     amountEl.textContent = trigger.dataset.amount || '';
     accountEl.textContent = trigger.dataset.account || '';
+
+    if (errorEl) {
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+    }
+
+    if (panel) {
+      panel.classList.remove('confirm-modal__panel--early', 'confirm-modal__panel--normal');
+    }
+
+    if (isEarly) {
+      titleEl.textContent = 'Process Bill Early?';
+      confirmBtn.textContent = 'Yes, Process Early';
+
+      if (earlyWarningEl) {
+        earlyWarningEl.style.display = '';
+      }
+
+      if (panel) {
+        panel.classList.add('confirm-modal__panel--early');
+      }
+    } else {
+      titleEl.textContent = 'Process Bill Now?';
+      confirmBtn.textContent = 'Yes, Process Now';
+
+      if (earlyWarningEl) {
+        earlyWarningEl.style.display = 'none';
+      }
+
+      if (panel) {
+        panel.classList.add('confirm-modal__panel--normal');
+      }
+    }
 
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -320,6 +359,17 @@ document.addEventListener('DOMContentLoaded', function () {
     modal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
     activeForm = null;
+
+    if (panel) {
+      panel.classList.remove('confirm-modal__panel--early', 'confirm-modal__panel--normal');
+    }
+
+    if (errorEl) {
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+    }
+
+    confirmBtn.disabled = false;
   }
 
   document.querySelectorAll('.process-now-trigger').forEach(function (button) {
@@ -332,9 +382,43 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (confirmBtn) {
     confirmBtn.addEventListener('click', function () {
-      if (activeForm) {
-        activeForm.submit();
-      }
+      if (!activeForm) return;
+
+      confirmBtn.disabled = true;
+
+      const formData = new FormData(activeForm);
+
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        if (data.success && data.redirect) {
+          window.location.href = data.redirect;
+          return;
+        }
+
+        if (errorEl) {
+          errorEl.textContent = data.message || 'Unable to process this bill.';
+          errorEl.style.display = '';
+        }
+
+        confirmBtn.disabled = false;
+      })
+      .catch(function () {
+        if (errorEl) {
+          errorEl.textContent = 'Something went wrong while trying to process this bill.';
+          errorEl.style.display = '';
+        }
+
+        confirmBtn.disabled = false;
+      });
     });
   }
 

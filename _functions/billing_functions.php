@@ -427,26 +427,26 @@ function process_single_due_draft(
   $amount = amount_for_bill_due_date($pdo_db, $bill, $user_id, $due_date);
 
   $processed_at = $processed_at ?: date('Y-m-d H:i:s');
-  $processed_date = date('m.d.y', strtotime($processed_at));
+  $processed_date = date('Y-m-d', strtotime($processed_at));
 
+  $due_date_only = date('Y-m-d', strtotime($due_date));
+  $processed_date_only = date('Y-m-d', strtotime($processed_at));
 
-  $due_date_only = date('m.d.y', strtotime($due_date));
-  $processed_date_only = date('m.d.y', strtotime($processed_at));
+  $due_date_display = date('m.d.y', strtotime($due_date));
+  $processed_date_display = date('m.d.y', strtotime($processed_at));
 
   $processed_early = ($processed_date_only < $due_date_only);
 
-  $payment_note = 'Auto-deducted from funding account pool';
-  $ledger_note = 'Automatic draft deduction for ' . $bill['billing_name'];
+  $payment_note = 'Manually processed early from funding account pool. Scheduled due date: ' . $due_date_display;
+  $ledger_note = 'Manual early processing for ' . $bill['billing_name'] . '. Scheduled due date: ' . $due_date_display;
 
   if ($manual_override && $processed_early) {
-    $payment_note = 'Manually processed early from funding account pool. Scheduled due date: ' . $due_date_only;
-    $ledger_note = 'Manual early processing for ' . $bill['billing_name'] . '. Scheduled due date: ' . $due_date_only;
+    $payment_note = 'Manually processed early from funding account pool. Scheduled due date: ' . $due_date_display;
+    $ledger_note = 'Manual early processing for ' . $bill['billing_name'] . '. Scheduled due date: ' . $due_date_display;
   } elseif ($manual_override) {
     $payment_note = 'Manually processed from funding account pool.';
     $ledger_note = 'Manual processing for ' . $bill['billing_name'];
   }
-
-
 
   if ($amount <= 0) {
     return false;
@@ -1574,7 +1574,7 @@ function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_
   $stmt = $pdo_db->prepare("
     SELECT
       bill_payment_id,
-      CONCAT(date_paid, ' 00:00:00') AS event_datetime,
+      created_at AS event_datetime,
       amount_paid,
       confirmation_note
     FROM bill_payments
@@ -1982,7 +1982,7 @@ function sync_custom_bill_actual_due_date(PDO $pdo_db, int $user_id, int $billin
   ]);
 }
 
-function process_bill_now(PDO $pdo_db, int $user_id, int $billing_account_id, string $due_date): bool
+function process_bill_now(PDO $pdo_db, int $user_id, int $billing_account_id, string $due_date): array
 {
   $stmt = $pdo_db->prepare("
     SELECT
@@ -2000,8 +2000,49 @@ function process_bill_now(PDO $pdo_db, int $user_id, int $billing_account_id, st
   $bill = $stmt->fetch(PDO::FETCH_ASSOC);
 
   if (!$bill) {
-    return false;
+    return [
+      'success' => false,
+      'reason' => 'bill_not_found'
+    ];
   }
 
-  return process_single_due_draft($pdo_db, $bill, $due_date, date('Y-m-d H:i:s'), true);
+  $amount = amount_for_bill_due_date($pdo_db, $bill, $user_id, $due_date);
+  if ($amount <= 0) {
+    return [
+      'success' => false,
+      'reason' => 'invalid_amount'
+    ];
+  }
+
+  $funding_account_id = isset($bill['default_funding_account_id']) ? (int)$bill['default_funding_account_id'] : 0;
+  if ($funding_account_id < 1) {
+    return [
+      'success' => false,
+      'reason' => 'missing_funding_account'
+    ];
+  }
+
+  if (payment_already_recorded($pdo_db, $billing_account_id, $user_id, $due_date)) {
+    return [
+      'success' => false,
+      'reason' => 'already_processed'
+    ];
+  }
+
+  $current_pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+  if ($current_pool_balance < $amount) {
+    return [
+      'success' => false,
+      'reason' => 'insufficient_funds',
+      'needed' => round($amount, 2),
+      'available' => round($current_pool_balance, 2)
+    ];
+  }
+
+  $processed = process_single_due_draft($pdo_db, $bill, $due_date, date('Y-m-d H:i:s'), true);
+
+  return [
+    'success' => $processed,
+    'reason' => $processed ? null : 'unknown_failure'
+  ];
 }

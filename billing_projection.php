@@ -12,15 +12,58 @@ if (is_post_request() && isset($_POST['process_now'])) {
   $process_billing_account_id = isset($_POST['billing_account_id']) ? (int)$_POST['billing_account_id'] : 0;
   $process_due_date = trim($_POST['due_date'] ?? '');
 
+  $is_ajax = isset($_POST['ajax']) && $_POST['ajax'] === '1';
+
+  $response = [
+    'success' => false,
+    'message' => 'Unable to process this bill.'
+  ];
+
   if (
     $process_billing_account_id > 0 &&
     preg_match('/^\d{4}-\d{2}-\d{2}$/', $process_due_date)
   ) {
-    process_bill_now($pdo_db, $user_id, $process_billing_account_id, $process_due_date);
+    $result = process_bill_now($pdo_db, $user_id, $process_billing_account_id, $process_due_date);
+
+    if (!empty($result['success'])) {
+      $response = [
+        'success' => true,
+        'redirect' => 'billing_projection.php?account=' . urlencode($selected_account)
+      ];
+    } else {
+      if (($result['reason'] ?? '') === 'insufficient_funds') {
+        $response['message'] =
+          'Not enough funds available. Needed: $' .
+          number_format((float)($result['needed'] ?? 0), 2) .
+          '. Available: $' .
+          number_format((float)($result['available'] ?? 0), 2) . '.';
+      } elseif (($result['reason'] ?? '') === 'already_processed') {
+        $response['message'] = 'This bill has already been processed for that due date.';
+      } elseif (($result['reason'] ?? '') === 'missing_funding_account') {
+        $response['message'] = 'No funding account is assigned to this bill.';
+      } elseif (($result['reason'] ?? '') === 'bill_not_found') {
+        $response['message'] = 'The bill could not be found.';
+      } elseif (($result['reason'] ?? '') === 'invalid_amount') {
+        $response['message'] = 'This bill has an invalid amount due.';
+      }
+    }
+  } else {
+    $response['message'] = 'Invalid request.';
+  }
+
+  if ($is_ajax) {
+    header('Content-Type: application/json');
+    echo json_encode($response);
+    exit();
+  }
+
+  if (!empty($response['success']) && !empty($response['redirect'])) {
+    redirect_to($response['redirect']);
   }
 
   redirect_to('billing_projection.php?account=' . urlencode($selected_account));
 }
+
 
 // $reconciliation = reconcile_due_bills_against_reserves($pdo_db, $user_id);
 reconcile_due_bills_against_reserves($pdo_db, $user_id);
@@ -322,25 +365,35 @@ require '_includes/nav.php';
             ?>
 
             <?php if ($is_first_occurrence_for_bill): ?>
-              <form method="post" class="process-now-form" style="margin:0;">
-                <input type="hidden" name="process_now" value="1">
-                <input type="hidden" name="billing_account_id" value="<?php echo (int)$event['billing_account_id']; ?>">
-                <input type="hidden" name="due_date" value="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>">
 
-                <button
-                  type="button"
-                  class="postnow-btn process-now-trigger"
-                  data-bill-name="<?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>"
-                  data-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
-                  data-amount="<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
-                  data-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
-                >
-                  Process Now
-                </button>
-              </form>
-            <?php else: ?>
-              &nbsp;
-            <?php endif; ?>
+            <?php
+            $today_for_compare = new DateTime('today');
+            $event_due_date = new DateTime((string)$event['due_date']);
+            $event_due_date->setTime(0, 0, 0);
+            $is_early_process = ($event_due_date > $today_for_compare);
+            ?>
+            <form method="post" class="process-now-form" style="margin:0;">
+              <input type="hidden" name="process_now" value="1">
+              <input type="hidden" name="ajax" value="1">
+              <input type="hidden" name="billing_account_id" value="<?php echo (int)$event['billing_account_id']; ?>">
+              <input type="hidden" name="due_date" value="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>">
+
+              <button
+                type="button"
+                class="postnow-btn process-now-trigger"
+                data-bill-name="<?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>"
+                data-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
+                data-amount="<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
+                data-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
+                data-is-early="<?php echo $is_early_process ? '1' : '0'; ?>"
+              >
+                <?php echo $is_early_process ? 'Process Early' : 'Process Now'; ?>
+              </button>
+            </form>
+          <?php else: ?>
+            &nbsp;
+          <?php endif; ?>
+
           </td>
 
         </tr>
@@ -388,9 +441,15 @@ require '_includes/nav.php';
       <div><span>Scheduled Due Date:</span> <strong id="modal-due-date"></strong></div>
     </div>
 
+    <p class="confirm-modal__warning" id="modal-early-warning" style="display:none;">
+      This bill is scheduled for a future due date and will be processed ahead of schedule. The payment and funding deduction will be recorded today, while the scheduled due date remains part of the record.
+    </p>
+
     <p class="confirm-modal__note">
       This will deduct funds now, record a payment, and advance the bill.
     </p>
+
+    <div class="confirm-modal__error" id="process-now-error" style="display:none;"></div>
 
     <div class="confirm-modal__actions">
       <button type="button" class="btn-two" id="process-now-cancel">Cancel</button>
@@ -398,7 +457,5 @@ require '_includes/nav.php';
     </div>
   </div>
 </div>
-
-
 
 <?php require '_includes/footer.php'; ?>

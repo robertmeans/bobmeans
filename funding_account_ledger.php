@@ -169,14 +169,22 @@ require '_includes/nav.php';
 
                 <td>
                   <?php
-                  if ($row['event_type'] === 'account_adjustment') {
-                    echo 'Account';
-                  } elseif ($row['event_type'] === 'bill_reserve') {
-                    echo 'Bill Reserve';
-                  } elseif ($row['event_type'] === 'bill_payment') {
-                    echo 'Payment';
+                  $note_text = (string)($row['note'] ?? '');
+                  $sub_type = (string)($row['sub_type'] ?? '');
+                  $billing_name = (string)($row['billing_name'] ?? '');
+
+                  if (stripos($note_text, 'Retroactive payment adjustment') !== false) {
+                    echo 'Payment Adjustment';
+                  } elseif (stripos($note_text, 'Manual early processing') !== false) {
+                    echo 'Manual Early Processing';
+                  } elseif (stripos($note_text, 'Manual processing') !== false) {
+                    echo 'Manual Processing';
+                  } elseif (!empty($billing_name) && $sub_type === 'deduction') {
+                    echo 'Bill Payment';
+                  } elseif ($sub_type === 'contribution' || $sub_type === 'deduction') {
+                    echo 'Reserve Adjustment';
                   } else {
-                    echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8');
+                    echo 'Funding Activity';
                   }
                   ?>
                 </td>
@@ -191,9 +199,21 @@ require '_includes/nav.php';
                   <?php endif; ?>
                 </td>
 
-                <td><?php echo htmlspecialchars((string)$row['sub_type'], ENT_QUOTES, 'UTF-8'); ?></td>
-
-
+                <td>
+                  <?php
+                  if ($row['event_type'] === 'account_transaction') {
+                    if ($sub_type === 'contribution') {
+                      echo 'Contribution';
+                    } elseif ($sub_type === 'deduction') {
+                      echo 'Deduction';
+                    } else {
+                      echo 'Adjustment';
+                    }
+                  } else {
+                    echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['event_type'])), ENT_QUOTES, 'UTF-8');
+                  }
+                  ?>
+                </td>
 
                 <td <?php if ((float)$row['signed_amount'] < 0) { echo 'class="ded-red"'; } ?>>
                   <?php
@@ -204,11 +224,6 @@ require '_includes/nav.php';
 
                 <td <?php if ((float)$row['running_balance'] < 0) { echo 'class="ded-red"'; } ?>>$<?php echo number_format((float)$row['running_balance'], 2); ?></td>
 
-
-
-
-
-
                 <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
 
                 <td style="text-align: center;">
@@ -216,7 +231,6 @@ require '_includes/nav.php';
                     <i class="fas fa-edit"></i>
                   </a>
                 </td>
-
 
               </tr>
             <?php endforeach; ?>

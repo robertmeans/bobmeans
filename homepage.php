@@ -248,7 +248,7 @@ require '_includes/nav.php';
 
       <div class="hpc">
         <div class="card-title">
-          Fund Next
+          Next Up
         </div>
         <div class="dashboard-card w-title">
 
@@ -273,7 +273,7 @@ require '_includes/nav.php';
           <li class="hcli">
             <?php  echo ($index === 0) ? '' : 'and'; ?>
               <?php echo htmlspecialchars($item['funding_account'], ENT_QUOTES, 'UTF-8'); ?> will need $<?php echo number_format((float)$item['remaining_due'], 2); ?> 
-            for <?php echo htmlspecialchars($item['billing_name'], ENT_QUOTES, 'UTF-8'); ?> <div class="mct"> [<a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$item['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$item['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$item['billing_name']); ?>">add $<?php echo number_format((float)$item['remaining_due'], 2); ?></a>]</div>
+            for <?php echo htmlspecialchars($item['billing_name'], ENT_QUOTES, 'UTF-8'); ?> <div class="mct"><a href="reserve_adjustment.php?funding_account_id=<?php echo (int)$item['default_funding_account_id']; ?>&amount=<?php echo urlencode(number_format((float)$item['remaining_due'], 2, '.', '')); ?>&bill=<?php echo urlencode((string)$item['billing_name']); ?>">add $<?php echo number_format((float)$item['remaining_due'], 2); ?></a> | <a href="billing_projection.php?account=<?php echo urlencode($item['funding_account']); ?>">view projection</a></div>
           </li>
         <?php endforeach; ?>
 
@@ -288,7 +288,7 @@ require '_includes/nav.php';
 
       <div class="hpc">
         <div class="card-title">
-          Next Up
+          Per Funding Account
         </div>
         <div class="dashboard-card w-title">
           <?php if ($account_attention_list): ?>
@@ -436,8 +436,23 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       <div class="dashboard-card wide-card">
-        <h2>Recent Bill Activity</h2>
+        <h2>Recent Payments</h2>
 
         <?php if ($recent_bill_activity): ?>
           <table class="full-width">
@@ -445,7 +460,6 @@ require '_includes/nav.php';
               <tr>
                 <th>When</th>
                 <th>Bill</th>
-                <th>Type</th>
                 <th>Amount</th>
                 <th>Note</th>
               </tr>
@@ -460,34 +474,23 @@ require '_includes/nav.php';
                       : '';
                     ?>
                   </td>
+
                   <td>
                     <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
                       <?php echo htmlspecialchars((string)$row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
                     </a>
                   </td>
-                  <td><?php echo htmlspecialchars((string)$row['event_type'], ENT_QUOTES, 'UTF-8'); ?></td>
 
                   <td>
                     <?php
                     $sign = ((float)$row['signed_amount'] < 0) ? '-' : '+';
                     ?>
-
-                    <?php if ((string)$row['event_source'] === 'bill_payment'): ?>
-                      <a href="adjust_bill_payment.php?bill_payment_id=<?php echo (int)$row['bill_payment_id']; ?>">
-                        <?php echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2); ?>
-                      </a>
-                    <?php else: ?>
+                    <a href="adjust_bill_payment.php?bill_payment_id=<?php echo (int)$row['bill_payment_id']; ?>">
                       <?php echo $sign . '$' . number_format(abs((float)$row['signed_amount']), 2); ?>
-                    <?php endif; ?>
+                    </a>
                   </td>
 
-                  <td>
-                    <?php if (htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8') === "Auto-deducted from reserve") {
-                      echo 'Auto-deducted from funding account pool';
-                    } else {
-                      echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8');
-                    } ?>
-                  </td>
+                  <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -496,6 +499,24 @@ require '_includes/nav.php';
           <p>No recent bill activity yet.</p>
         <?php endif; ?>
       </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       <div class="dashboard-card wide-card">
         <h2>Recent Account Adjustments</h2>
