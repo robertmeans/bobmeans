@@ -884,6 +884,7 @@ function projection_summary_for_account(
   $projection = apply_pool_to_projected_events($events, $pool_amount);
 
   $next_uncovered_event = null;
+  $next_uncovered_events_same_date = [];
   $monthly_needed_totals = [];
 
   $month_cursor = new DateTime('first day of this month');
@@ -902,6 +903,12 @@ function projection_summary_for_account(
     ) {
       if ($next_uncovered_event === null) {
         $next_uncovered_event = $event;
+        $next_uncovered_events_same_date[] = $event;
+      } elseif (
+        (string)$event['due_date'] ===
+        (string)$next_uncovered_event['due_date']
+      ) {
+        $next_uncovered_events_same_date[] = $event;
       }
 
       $month_key = date('Y-m', strtotime($event['due_date']));
@@ -933,13 +940,24 @@ function projection_summary_for_account(
   if ($next_uncovered_event !== null) {
     $next_date = new DateTime($next_uncovered_event['due_date']);
     $next_date->setTime(0, 0, 0);
-    $next_uncovered_days = (int)$today->diff($next_date)->format('%r%a');
+
+    $next_uncovered_days = (int)$today
+      ->diff($next_date)
+      ->format('%r%a');
+
+    $combined_remaining_due = 0.00;
+
+    foreach ($next_uncovered_events_same_date as $event) {
+      $combined_remaining_due +=
+        (float)($event['remaining_due'] ?? 0);
+    }
 
     $first_problem_summary = [
-      'status' => $next_uncovered_event['status'],
-      'message' => '<strong>' . $next_uncovered_event['status'] . '</strong> ' . date('M j', strtotime($next_uncovered_event['due_date'])) . ' - ',
-      'remaining_due' => (float)$next_uncovered_event['remaining_due'],
-      'due_date' => $next_uncovered_event['due_date']
+      'status' => (string)$next_uncovered_event['status'],
+      'due_date' => (string)$next_uncovered_event['due_date'],
+      'days_until' => $next_uncovered_days,
+      'remaining_due' => round($combined_remaining_due, 2),
+      'events' => $next_uncovered_events_same_date
     ];
   }
 
@@ -949,6 +967,7 @@ function projection_summary_for_account(
     'events' => $events,
     'projection' => $projection,
     'next_uncovered_event' => $next_uncovered_event,
+    'next_uncovered_events_same_date' => $next_uncovered_events_same_date,
     'next_uncovered_days' => $next_uncovered_days,
     'monthly_needed_totals' => $monthly_needed_totals,
     'first_problem_summary' => $first_problem_summary
@@ -2064,5 +2083,105 @@ function process_bill_now(PDO $pdo_db, int $user_id, int $billing_account_id, st
   return [
     'success' => $processed,
     'reason' => $processed ? null : 'unknown_failure'
+  ];
+}
+
+function coverage_horizon_for_account(
+  PDO $pdo_db,
+  string $account_name,
+  array $rows_for_account,
+  float $pool_amount,
+  int $starting_months = 12,
+  int $maximum_months = 600
+): array {
+  $months_ahead = $starting_months;
+  $summary = [];
+
+  while ($months_ahead <= $maximum_months) {
+    $summary = projection_summary_for_account(
+      $pdo_db,
+      $account_name,
+      $rows_for_account,
+      $pool_amount,
+      $months_ahead
+    );
+
+    /*
+     * A shortage was found, so this is the actual horizon.
+     */
+    if ($summary['next_uncovered_days'] !== null) {
+      return [
+        'account_name' => $account_name,
+        'pool_amount' => round($pool_amount, 2),
+        'coverage_days' => max(
+          0,
+          (int)$summary['next_uncovered_days']
+        ),
+        'coverage_date' =>
+          $summary['next_uncovered_event']['due_date'] ?? null,
+        'has_shortfall' => true,
+        'is_estimate' => false,
+        'months_examined' => $months_ahead,
+        'has_active_bills' =>
+          !empty($summary['projection']['events'])
+      ];
+    }
+
+    /*
+     * No projected bill events means there is nothing to measure.
+     */
+    if (empty($summary['projection']['events'])) {
+      return [
+        'account_name' => $account_name,
+        'pool_amount' => round($pool_amount, 2),
+        'coverage_days' => null,
+        'coverage_date' => null,
+        'has_shortfall' => false,
+        'is_estimate' => false,
+        'months_examined' => $months_ahead,
+        'has_active_bills' => false
+      ];
+    }
+
+    if ($months_ahead === $maximum_months) {
+      break;
+    }
+
+    $months_ahead = min(
+      $months_ahead * 2,
+      $maximum_months
+    );
+  }
+
+  /*
+   * Still covered at the maximum projection horizon.
+   * Report this as "at least," not as an exact endpoint.
+   */
+  $last_event = end($summary['projection']['events']);
+  $last_due_date = $last_event['due_date'] ?? null;
+  $coverage_days = null;
+
+  if ($last_due_date) {
+    $today = new DateTime('today');
+    $today->setTime(0, 0, 0);
+
+    $last_date = new DateTime($last_due_date);
+    $last_date->setTime(0, 0, 0);
+
+    $coverage_days = max(
+      0,
+      (int)$today->diff($last_date)->format('%r%a')
+    );
+  }
+
+  return [
+    'account_name' => $account_name,
+    'pool_amount' => round($pool_amount, 2),
+    'coverage_days' => $coverage_days,
+    'coverage_date' => $last_due_date,
+    'has_shortfall' => false,
+    'is_estimate' => true,
+    'months_examined' => $maximum_months,
+    'has_active_bills' => true
   ];
 }

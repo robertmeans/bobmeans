@@ -142,7 +142,9 @@ li.hcli { /* homepage card li */
   border-radius: 10px;
   margin: 0 0 10px 0;
 }
-
+ul.funding-status-list {
+  padding-left: 10px;
+}
 
 .hcul { /* homepage card ul */
   margin-top: 0;
@@ -231,4 +233,19 @@ table.full-width {
   &.nt {
     width: 30px;
   }
+}
+
+.coverage-urgent {
+  border-left: 4px solid currentColor;
+}
+
+.coverage-days.urgent {
+  font-weight: 700;
+}
+
+.urgency-indicator {
+  display: inline-block;
+  margin-left: 0.5em;
+  font-size: 0.8em;
+  text-transform: uppercase;
 }

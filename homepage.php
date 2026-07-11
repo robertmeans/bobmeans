@@ -135,6 +135,7 @@ $projection_dashboard = projection_summary_for_all_accounts(
   12
 );
 
+$account_summaries = $projection_dashboard['account_summaries'] ?? [];
 $account_attention_list = $projection_dashboard['account_attention_list'];
 $next_uncovered_bill = $projection_dashboard['next_uncovered_bill'];
 $next_uncovered_bills_same_date = $projection_dashboard['next_uncovered_bills_same_date'] ?? [];
@@ -202,6 +203,64 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $recent_payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+
+
+
+
+
+
+
+
+$coverage_horizon = [];
+
+foreach ($rows_by_account as $account_name => $rows_for_account) {
+  $pool_amount = isset($reserve_totals[$account_name])
+    ? (float)$reserve_totals[$account_name]
+    : 0.00;
+
+  $coverage_horizon[] = coverage_horizon_for_account(
+    $pdo_db,
+    (string)$account_name,
+    $rows_for_account,
+    $pool_amount
+  );
+}
+
+/*
+ * Earliest concern first.
+ * Accounts without active bills fall to the bottom.
+ */
+usort($coverage_horizon, function ($a, $b) {
+  $days_a = $a['coverage_days'] ?? PHP_INT_MAX;
+  $days_b = $b['coverage_days'] ?? PHP_INT_MAX;
+
+  if ($days_a === $days_b) {
+    return strcmp(
+      (string)$a['account_name'],
+      (string)$b['account_name']
+    );
+  }
+
+  return $days_a <=> $days_b;
+});
+
+$multiple_coverage_accounts = count($coverage_horizon) > 1;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -218,7 +277,16 @@ require '_includes/nav.php';
 
     </div>
 
+
+
+
     <div class="dashboard-grid">
+
+
+
+
+
+
 
       <div class="hpc">
         <div class="card-title">
@@ -298,53 +366,123 @@ require '_includes/nav.php';
         </div>
       </div>
 
+
+
+
+
+
+
+<div class="hpc">
+  <div class="card-title">
+    Coverage Horizon
+  </div>
+
+  <div class="dashboard-card w-title">
+
+    <?php if ($coverage_horizon): ?>
+
+      <?php foreach ($coverage_horizon as $account): ?>
+        <?php
+        $coverage_days = $account['coverage_days'];
+
+        $is_urgent =
+          $account['has_shortfall'] &&
+          $coverage_days !== null &&
+          $coverage_days <= 30;
+
+        $wrapper_classes = [];
+
+        if ($multiple_coverage_accounts) {
+          $wrapper_classes[] = 'vstd';
+        }
+
+        if ($is_urgent) {
+          $wrapper_classes[] = 'coverage-urgent';
+        }
+        ?>
+
+        <div<?php
+          echo $wrapper_classes
+            ? ' class="' . htmlspecialchars(
+                implode(' ', $wrapper_classes),
+                ENT_QUOTES,
+                'UTF-8'
+              ) . '"'
+            : '';
+        ?>>
+
+          <div class="coverage-account">
+            <strong>
+              <?php echo htmlspecialchars(
+                $account['account_name'],
+                ENT_QUOTES,
+                'UTF-8'
+              ); ?>:
+            </strong>
+
+            $<?php echo number_format(
+              (float)$account['pool_amount'],
+              2
+            ); ?>
+          </div>
+
+          <div class="coverage-days<?php echo $is_urgent ? ' urgent' : ''; ?>">
+
+            <?php if (!$account['has_active_bills']): ?>
+
+              No active bills assigned
+
+            <?php elseif ($coverage_days !== null): ?>
+
+              <?php echo !empty($account['is_estimate']) ? 'covered for at least' : 'covered for'; ?>
+              <strong>
+                <?php echo number_format($coverage_days); ?>
+                day<?php echo $coverage_days === 1 ? '' : 's'; ?>
+              </strong>
+
+              <?php if ($is_urgent): ?>
+                <span class="urgency-indicator">
+                  Funding needed soon
+                </span>
+              <?php endif; ?>
+
+            <?php else: ?>
+
+              No coverage date available
+
+            <?php endif; ?>
+
+          </div>
+
+          <div class="mct">
+            <a href="billing_projection.php?account=<?php
+              echo urlencode($account['account_name']);
+            ?>">
+              view projection
+            </a>
+          </div>
+
+        </div>
+
+      <?php endforeach; ?>
+
+    <?php else: ?>
+
+      <p>No funding accounts found.</p>
+
+    <?php endif; ?>
+
+  </div>
+</div>
+
+
+
+
+
+
       <div class="hpc">
         <div class="card-title">
-          Per Funding Account
-        </div>
-        <div class="dashboard-card w-title">
-          <?php if ($account_attention_list): ?>
-            <?php foreach ($account_attention_list as $item): ?>
-              <?php
-              $account_name = $item['account_name'];
-              $summary = $item['summary'];
-              ?>
-
-            <li class="hcli <?php echo htmlspecialchars((string)$summary['status'], ENT_QUOTES, 'UTF-8'); ?>">
-
-              <strong><?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?>:</strong> next 
-
-              
-                <?php if ($summary['status'] === 'partial' || $summary['status'] === 'due'): ?>
-                  <?php echo $summary['message']; ?>
-                   $<?php echo number_format((float)$summary['remaining_due'], 2); ?>
-                   <div class="mct">[<a class="account-jump" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">view projection</a>]</div>
-                <?php else: ?>
-                  <?php echo $summary['message']; ?>
-                <?php endif; ?>
-
-            </li>
-            <?php endforeach; ?>
-          <?php else: ?>
-            <p>No active billing accounts found.</p>
-          <?php endif; ?>
-        </div>
-      </div>
-
-
-
-
-
-
-
-
-
-
-
-
-      <div class="hpc">
-        <div class="card-title">
-          Due by Month
+          Funding Needed by Month
         </div>
         <div class="dashboard-card w-title">
           
@@ -366,7 +504,30 @@ require '_includes/nav.php';
         </div>
       </div>
 
+
+
+
+
+
+
+
     </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <div class="dashboard-grid lower-grid">
 
