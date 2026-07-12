@@ -26,6 +26,7 @@ if ($billing_account_id < 1) {
   $stmt = $pdo_db->prepare("
     SELECT
       ba.*,
+      fa.login_url AS fund_url,
       fa.account_name AS paid_from_account,
       tfa.account_name AS transferred_from_account
     FROM billing_accounts ba
@@ -173,12 +174,43 @@ require '_includes/nav.php';
 
       <div class="success" style="display:block;">
 
-        <strong><?= $bill_acct_name; ?></strong> <a href="edit_billing-account.php?billing_account_id=<?php echo $bill['billing_account_id']; ?>"><i class="fas fa-edit"></i></a><br>
+
+
+
+
+        <strong><?= $bill_acct_name; ?></strong> <a class="bd-smtxt" href="edit_billing-account.php?billing_account_id=<?php echo $bill['billing_account_id']; ?>">Edit</a>
+        <?php if (empty($bill['vendor_name']) && !empty($bill['login_url'])): ?>
+          <a class="bd-smtxt" href="<?php echo htmlspecialchars((string)$bill['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+            Website
+          </a>
+        <?php endif; ?>
+
+
+        <br>
 
         <?php if (!empty($bill['vendor_name'])): ?>
-          Vendor: <?php echo htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); ?><br>
+          Vendor: <?php echo htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); ?>
+
+
+          <?php if (!empty($bill['login_url'])): ?>
+            <a class="bd-smtxt" href="<?php echo htmlspecialchars((string)$bill['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+              Website
+            </a>
+          <?php endif; ?>
+
+
+          <br>
         <?php endif; ?>
+
+
+
         Base Amount: $<?php echo number_format((float)$bill['default_amount'], 2); ?><br>
+
+
+
+
+
+
 
         <?php if (!empty($bill['actual_due_date'])): ?>
           <strong>Next Scheduled Draft:</strong>
@@ -197,20 +229,34 @@ require '_includes/nav.php';
 
         Cadence: <?php echo htmlspecialchars((string)$bill['cadence'], ENT_QUOTES, 'UTF-8'); ?><br>
 
+
+
+
+
+
         Paid From:
+        <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
+
+
+        <a class="bd-smtxt" href="billing_projection.php?account=<?php echo urlencode((string)$bill['paid_from_account']); ?>">
+          Projection
+        </a>
+
         <?php if (!empty($bill['default_funding_account_id']) && !empty($bill['paid_from_account'])): ?>
-          <a href="funding_account_ledger.php?funding_account_id=<?php echo (int)$bill['default_funding_account_id']; ?>">
-            <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
+          <a class="bd-smtxt" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$bill['default_funding_account_id']; ?>">
+            Ledger
           </a>
-        <?php else: ?>
-          <?php echo htmlspecialchars((string)$bill['paid_from_account'], ENT_QUOTES, 'UTF-8'); ?>
         <?php endif; ?>
 
-        <?php if (!empty($bill['login_url'])): ?>
-          <br><a class="btn-one" href="<?php echo htmlspecialchars((string)$bill['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
-            Login to <?php if ($vendor_name !== '') { echo $vendor_name; } else { echo $bill_acct_name; } ?>
-          </a><br>
+        <?php if (!empty($bill['fund_url'])): ?>
+          <a class="bd-smtxt" href="<?php echo $bill['fund_url']; ?>" target="_blank">
+            Website
+          </a>
         <?php endif; ?>
+
+
+
+
 
       </div>
 

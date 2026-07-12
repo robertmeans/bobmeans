@@ -180,12 +180,33 @@ ul.funding-status-list {
 @media (max-width: 1100px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
+    &.lower-grid {
+      grid-template-columns: 1fr;
+      display: flex;
+      flex-direction: column;
+      max-width: 96%;
+      align-items: center;      
+    }    
   }
 }
 
 @media (max-width: 700px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    max-width: 96%;
+    align-items: center;
+    &.lower-grid {
+      grid-template-columns: 1fr;
+      display: flex;
+      flex-direction: column;
+      max-width: 96%;
+      align-items: center;      
+    }
+  }
+  .hpc {
+    width: 100%;
   }
 }
 
@@ -248,4 +269,43 @@ table.full-width {
   margin-left: 0.5em;
   font-size: 0.8em;
   text-transform: uppercase;
+}
+
+a.ch-external {
+  font-size: 9px;
+  vertical-align: 6px;
+  margin-left: 6px;
+  opacity: 0.4;
+  transition: all 0.2s ease;
+  &:hover {
+    opacity: 1;
+    text-decoration: none;
+  }
+  &.white {
+    color: #fff;
+  }
+}
+/* used on bill_details.php for link next to "Paid From" */
+a.bd-smtxt {
+  font-size: 12px;
+  margin-left: 6px;
+  opacity: 0.4;
+  color: #fff;
+  transition: all 0.2s ease;
+  &.extra {
+    opacity: 0.6;
+  }  
+  &:hover {
+    opacity: 1;
+    text-decoration: none;
+  }  
+}
+a.w-lnk {
+  opacity: 0.4;
+  color: #fff;
+  transition: all 0.2s ease;
+  &:hover {
+    opacity: 1;
+    text-decoration: none;
+  }
 }

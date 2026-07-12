@@ -14,7 +14,7 @@ if (function_exists('reconcile_due_bills_against_reserves')) {
 }
 
 /*
-  load active billing accounts with funding account names
+  load active billing accounts with funding account names and login urls
 */
 $stmt = $pdo_db->prepare("
   SELECT
@@ -32,6 +32,7 @@ $stmt = $pdo_db->prepare("
     ba.due_month_of_year,
     ba.is_active,
     ba.default_funding_account_id,
+    fa.login_url,
     fa.account_name AS paid_from_account
   FROM billing_accounts ba
   LEFT JOIN funding_accounts fa
@@ -218,12 +219,18 @@ foreach ($rows_by_account as $account_name => $rows_for_account) {
     ? (float)$reserve_totals[$account_name]
     : 0.00;
 
-  $coverage_horizon[] = coverage_horizon_for_account(
+  $first_row = reset($rows_for_account);
+
+  $coverage_item = coverage_horizon_for_account(
     $pdo_db,
     (string)$account_name,
     $rows_for_account,
     $pool_amount
   );
+
+  $coverage_item['login_url'] = (string)($first_row['login_url'] ?? '');
+
+  $coverage_horizon[] = $coverage_item;
 }
 
 /*
@@ -246,21 +253,6 @@ usort($coverage_horizon, function ($a, $b) {
 
 $multiple_coverage_accounts = count($coverage_horizon) > 1;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -274,19 +266,21 @@ require '_includes/nav.php';
       <a href="billing_projection.php">Projection</a> |
       <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
       <a href="funding_account_ledger.php">Funding Account Ledger</a>
+    </div><?php /* .inner-links */ ?>
 
-    </div>
+
+
+
+
+
+
+
+
 
 
 
 
     <div class="dashboard-grid">
-
-
-
-
-
-
 
       <div class="hpc">
         <div class="card-title">
@@ -308,7 +302,7 @@ require '_includes/nav.php';
             <div class="dashboard-line">
               <span style="font-size:2em;font-weight:700;"><?php echo $days; ?></span>
               &nbsp;day<?php echo ($days === 1) ? '' : 's'; ?>
-              until <?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?>
+              until <span style="font-weight:500;"><?php echo date('M j\<\s\u\p\>S\<\/\s\u\p\>', strtotime($next_uncovered_bill['due_date'])); ?></span>, when
             </div>
 
             <?php $multiple_funding_accounts = count($next_up_groups) > 1; ?>
@@ -371,109 +365,129 @@ require '_includes/nav.php';
 
 
 
-
-<div class="hpc">
-  <div class="card-title">
-    Coverage Horizon
-  </div>
-
-  <div class="dashboard-card w-title">
-
-    <?php if ($coverage_horizon): ?>
-
-      <?php foreach ($coverage_horizon as $account): ?>
-        <?php
-        $coverage_days = $account['coverage_days'];
-
-        $is_urgent =
-          $account['has_shortfall'] &&
-          $coverage_days !== null &&
-          $coverage_days <= 30;
-
-        $wrapper_classes = [];
-
-        if ($multiple_coverage_accounts) {
-          $wrapper_classes[] = 'vstd';
-        }
-
-        if ($is_urgent) {
-          $wrapper_classes[] = 'coverage-urgent';
-        }
-        ?>
-
-        <div<?php
-          echo $wrapper_classes
-            ? ' class="' . htmlspecialchars(
-                implode(' ', $wrapper_classes),
-                ENT_QUOTES,
-                'UTF-8'
-              ) . '"'
-            : '';
-        ?>>
-
-          <div class="coverage-account">
-            <strong>
-              <?php echo htmlspecialchars(
-                $account['account_name'],
-                ENT_QUOTES,
-                'UTF-8'
-              ); ?>:
-            </strong>
-
-            $<?php echo number_format(
-              (float)$account['pool_amount'],
-              2
-            ); ?>
-          </div>
-
-          <div class="coverage-days<?php echo $is_urgent ? ' urgent' : ''; ?>">
-
-            <?php if (!$account['has_active_bills']): ?>
-
-              No active bills assigned
-
-            <?php elseif ($coverage_days !== null): ?>
-
-              <?php echo !empty($account['is_estimate']) ? 'covered for at least' : 'covered for'; ?>
-              <strong>
-                <?php echo number_format($coverage_days); ?>
-                day<?php echo $coverage_days === 1 ? '' : 's'; ?>
-              </strong>
-
-              <?php if ($is_urgent): ?>
-                <span class="urgency-indicator">
-                  Funding needed soon
-                </span>
-              <?php endif; ?>
-
-            <?php else: ?>
-
-              No coverage date available
-
-            <?php endif; ?>
-
-          </div>
-
-          <div class="mct">
-            <a href="billing_projection.php?account=<?php
-              echo urlencode($account['account_name']);
-            ?>">
-              view projection
-            </a>
-          </div>
-
+      <div class="hpc">
+        <div class="card-title">
+          Coverage Horizon
         </div>
 
-      <?php endforeach; ?>
+        <div class="dashboard-card w-title">
 
-    <?php else: ?>
+          <?php if ($coverage_horizon): ?>
 
-      <p>No funding accounts found.</p>
+            <?php foreach ($coverage_horizon as $account): ?>
+              <?php
+              $coverage_days = $account['coverage_days'];
+              $login_url = trim((string)($account['login_url'] ?? ''));
 
-    <?php endif; ?>
+              $is_urgent =
+                $account['has_shortfall'] &&
+                $coverage_days !== null &&
+                $coverage_days <= 30;
 
-  </div>
-</div>
+              $wrapper_classes = [];
+
+              if ($multiple_coverage_accounts) {
+                $wrapper_classes[] = 'vstd';
+              }
+
+              if ($is_urgent) {
+                $wrapper_classes[] = 'coverage-urgent';
+              }
+              ?>
+
+              <div <?php
+                echo $wrapper_classes
+                  ? 'class="' . htmlspecialchars(
+                      implode(' ', $wrapper_classes),
+                      ENT_QUOTES,
+                      'UTF-8'
+                    ) . '"'
+                  : '';
+              ?>>
+
+                <div class="coverage-account">
+                  <strong>
+                    <?php echo htmlspecialchars(
+                      $account['account_name'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    ); ?>:
+                  </strong>
+
+                  $<?php echo number_format(
+                    (float)$account['pool_amount'],
+                    2
+                  ); ?>
+
+
+
+
+
+
+                <?php if ($login_url !== ''): ?>
+                  <a class="ch-external" href="<?php echo htmlspecialchars($login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-external-link-alt"></i>
+                  </a>
+                <?php endif; ?>
+
+
+
+
+
+
+
+
+                </div>
+
+                <div class="coverage-days<?php echo $is_urgent ? ' urgent' : ''; ?>">
+
+                  <?php if (!$account['has_active_bills']): ?>
+
+                    No active bills assigned
+
+                  <?php elseif ($coverage_days !== null): ?>
+
+                    <?php echo !empty($account['is_estimate']) ? 'covered for at least' : 'covered for'; ?>
+                    <strong>
+                      <?php echo number_format($coverage_days); ?>
+                      day<?php echo $coverage_days === 1 ? '' : 's'; ?>
+                    </strong>
+
+                    <?php if ($is_urgent): ?>
+                      <span class="urgency-indicator">
+                        Funding needed soon
+                      </span>
+                    <?php endif; ?>
+
+                  <?php else: ?>
+
+                    No coverage date available
+
+                  <?php endif; ?>
+
+                </div>
+
+                <div class="mct">
+                  <a href="billing_projection.php?account=<?php
+                    echo urlencode($account['account_name']);
+                  ?>">
+                    view projection
+                  </a>
+                </div>
+
+              </div>
+
+            <?php endforeach; ?>
+
+          <?php else: ?>
+
+            <p>No funding accounts found.</p>
+
+          <?php endif; ?>
+
+        </div><?php /* .dashboard-card .w-title */ ?>
+
+      </div><?php /* .hpc */ ?>
 
 
 
@@ -504,16 +518,7 @@ require '_includes/nav.php';
         </div>
       </div>
 
-
-
-
-
-
-
-
-    </div>
-
-
+    </div><?php /* .dashboard-grid */ ?>
 
 
 
@@ -609,21 +614,6 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
       <div class="dashboard-card wide-card">
         <h2>Recent Payments</h2>
 
@@ -672,24 +662,6 @@ require '_includes/nav.php';
           <p>No recent bill activity yet.</p>
         <?php endif; ?>
       </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       <div class="dashboard-card wide-card">
         <h2>Recent Account Adjustments</h2>
@@ -740,7 +712,7 @@ require '_includes/nav.php';
 
     </div>
 
-  </div>
-</div>
+  </div><?php /* .billing-schedule */ ?>
+</div><?php /* .dashboard */ ?>
 
 <?php require '_includes/footer.php'; ?>

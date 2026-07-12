@@ -45,7 +45,7 @@ require '_includes/nav.php';
             <th>Next Draft</th>
             <th>Paid From</th>
             <th>Active</th>
-            <th>Website</th>
+            <?php /* <th>Website</th> */ ?>
             <th>Manage</th>
           </tr>
         </thead>
@@ -55,6 +55,17 @@ require '_includes/nav.php';
           <tr class="<?php echo ((int)$row['is_active'] === 1) ? 'active-row' : 'inactive-row'; ?>">
             <td>
               <?php echo htmlspecialchars($row['billing_name'], ENT_QUOTES, 'UTF-8'); ?>
+
+
+              <?php if (!empty($row['login_url'])): ?>
+                <a class="ch-external" href="<?php echo htmlspecialchars((string)$row['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                  <i class="fas fa-external-link-alt"></i>
+                </a>
+              <?php endif; ?>
+
+
+
+
               <?php if (!empty($row['vendor_name'])): ?>
                 <br><small><?php echo htmlspecialchars($row['vendor_name'], ENT_QUOTES, 'UTF-8'); ?></small>
               <?php endif; ?>
@@ -80,6 +91,11 @@ require '_includes/nav.php';
               <?php echo ((int)$row['is_active'] === 1) ? 'Yes' : 'No'; ?>
             </td>
 
+
+
+
+
+<?php /*
             <td>
               <?php if (!empty($row['login_url'])): ?>
                 <a href="<?php echo htmlspecialchars((string)$row['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
@@ -87,6 +103,12 @@ require '_includes/nav.php';
                 </a>
               <?php endif; ?>
             </td>
+*/ ?>
+
+
+
+
+
 
             <td>
               <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">Details</a>
@@ -111,7 +133,8 @@ require '_includes/nav.php';
     <div class="inner-links">
       <a href="index.php">Dashboard</a> |
       <a href="billing_projection.php">Projection</a> |
-      <a href="intake_billing-accounts.php">New Bill</a>
+      <a href="intake_billing-accounts.php">New Bill</a> | 
+      <a href="funding_accounts.php">Funding Accounts</a>
     </div>
 
   </div>

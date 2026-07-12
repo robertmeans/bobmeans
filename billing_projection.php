@@ -172,14 +172,14 @@ require '_includes/nav.php';
             &nbsp;<i class="fas fa-star"></i>
 
             <?php if (!empty($funding_account_id)): ?>
-              <a class="btn-three" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
+              <a class="bd-smtxt extra" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
                 Ledger
               </a>
             <?php endif; ?>
 
             <?php if (!empty($login_url)): ?>
-              <a class="btn-three" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
-                Login
+              <a class="bd-smtxt extra" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                Website
               </a>
             <?php endif; ?>
           </div>
@@ -188,14 +188,14 @@ require '_includes/nav.php';
             <a class="btn-four" href="billing_projection.php?account=<?php echo urlencode($account_name); ?>">Switch to: <?php echo htmlspecialchars($account_name, ENT_QUOTES, 'UTF-8'); ?> $<?php echo number_format($amount, 2); ?></a>
 
             <?php if (!empty($funding_account_id)): ?>
-              <a class="btn-four" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
+              <a class="bd-smtxt" href="funding_account_ledger.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
                 Ledger
               </a>
             <?php endif; ?>
 
             <?php if (!empty($login_url)): ?>
-              <a class="btn-four" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
-                Login
+              <a class="bd-smtxt" href="<?php echo htmlspecialchars((string)$login_url, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+                Website
               </a>
             <?php endif; ?>
           </div>

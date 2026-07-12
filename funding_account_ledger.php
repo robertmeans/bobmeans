@@ -124,18 +124,25 @@ require '_includes/nav.php';
     <?php if ($funding_account): ?>
       <div class="success" style="display:block;">
 
-        <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong> | <a href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a><br>
-        Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
+        <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong><a class="bd-smtxt" href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a>
 
-        <br><a href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">
+
+        <?php if (!empty($funding_account['login_url'])): ?>
+          <a class="bd-smtxt" href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
+            Website
+          </a>
+        <?php endif; ?>
+
+
+
+
+        <br>Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
+
+        <br><a class="w-lnk" href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">
           Adjust Balance
         </a>
 
-        <?php if (!empty($funding_account['login_url'])): ?>
-          <br><a class="btn-one" href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
-            Login to <?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?>
-          </a><br>
-        <?php endif; ?>
+
       
       </div>
 

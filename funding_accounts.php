@@ -83,6 +83,7 @@ require '_includes/nav.php';
     </table>
 
     <div class="inner-links">
+      <a href="index.php">Dashboard</a> |
       <a href="billing_projection.php">Projection</a> | 
       <a href="intake_funding-accounts.php">New Funding</a> |
       <a href="billing_accounts.php">Billing Accounts</a>
