@@ -74,6 +74,117 @@ if (is_post_request() && isset($_POST['add_bill_note']) && $bill) {
   }
 }
 
+/* deleting a future scheduled override */
+if (is_post_request() && isset($_POST['delete_amount_schedule']) && $bill) {
+  $bill_amount_schedule_id = isset($_POST['bill_amount_schedule_id'])
+    ? (int)$_POST['bill_amount_schedule_id']
+    : 0;
+
+  if ($bill_amount_schedule_id < 1) {
+    $errors[] = 'Scheduled amount rule not found.';
+  }
+
+  if (!$errors) {
+    $stmt = $pdo_db->prepare("
+      SELECT
+        bas.bill_amount_schedule_id,
+        bas.billing_account_id,
+        bas.effective_due_date,
+        bas.amount,
+        bas.adjustment_type,
+        bas.note
+      FROM bill_amount_schedule bas
+      INNER JOIN billing_accounts ba
+        ON bas.billing_account_id = ba.billing_account_id
+      WHERE bas.bill_amount_schedule_id = ?
+        AND bas.billing_account_id = ?
+        AND ba.user_id = ?
+      LIMIT 1
+    ");
+
+    $stmt->execute([
+      $bill_amount_schedule_id,
+      $billing_account_id,
+      $user_id
+    ]);
+
+    $schedule_row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$schedule_row) {
+      $errors[] = 'Scheduled amount rule not found.';
+    } elseif ((string)$schedule_row['effective_due_date'] <= date('Y-m-d')) {
+      $errors[] = 'Only future scheduled amount rules can be deleted.';
+    }
+  }
+
+  if (!$errors) {
+    $pdo_db->beginTransaction();
+
+    try {
+      $activity_details = [
+        'effective_due_date' => (string)$schedule_row['effective_due_date'],
+        'amount' => round((float)$schedule_row['amount'], 2),
+        'adjustment_type' => (string)($schedule_row['adjustment_type'] ?? 'single')
+      ];
+
+      $stmt = $pdo_db->prepare("
+        DELETE FROM bill_amount_schedule
+        WHERE bill_amount_schedule_id = ?
+          AND billing_account_id = ?
+        LIMIT 1
+      ");
+
+      $stmt->execute([
+        $bill_amount_schedule_id,
+        $billing_account_id
+      ]);
+
+      $stmt = $pdo_db->prepare("
+        INSERT INTO bill_activity_log (
+          billing_account_id,
+          user_id,
+          activity_type,
+          field_name,
+          old_value,
+          new_value,
+          note,
+          activity_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      ");
+
+      $stmt->execute([
+        $billing_account_id,
+        $user_id,
+        'amount_schedule_deleted',
+        'amount_schedule',
+        json_encode($activity_details),
+        null,
+        !empty($schedule_row['note']) ? $schedule_row['note'] : 'Scheduled amount rule deleted.'
+      ]);
+
+      $pdo_db->commit();
+
+      header('Location: bill_details.php?billing_account_id=' . $billing_account_id);
+      exit();
+
+    } catch (Throwable $e) {
+      if ($pdo_db->inTransaction()) {
+        $pdo_db->rollBack();
+      }
+
+      error_log(
+        'Scheduled amount deletion failed for bill_amount_schedule_id ' .
+        $bill_amount_schedule_id .
+        ': ' .
+        $e->getMessage()
+      );
+
+      $errors[] = 'The scheduled amount rule could not be deleted.';
+    }
+  }
+}
+
+
 if ($bill) {
 
   $stmt = $pdo_db->prepare("
@@ -145,6 +256,7 @@ require '_includes/header.php';
 require '_includes/nav.php';
 ?>
 
+
 <div class="intake-form">
   <div class="billing-schedule">
 
@@ -169,13 +281,10 @@ require '_includes/nav.php';
 
     <?php if ($bill):
     $bill_acct_name = htmlspecialchars($bill['billing_name'], ENT_QUOTES, 'UTF-8');
-    if ($bill['vendor_name']) { $vendor_name = htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); } 
+    if ($bill['vendor_name']) { $vendor_name = htmlspecialchars($bill['vendor_name'], ENT_QUOTES, 'UTF-8'); }
     ?>
 
       <div class="success" style="display:block;">
-
-
-
 
 
         <strong><?= $bill_acct_name; ?></strong> <a class="bd-smtxt" href="edit_billing-account.php?billing_account_id=<?php echo $bill['billing_account_id']; ?>">Edit</a>
@@ -202,14 +311,7 @@ require '_includes/nav.php';
           <br>
         <?php endif; ?>
 
-
-
         Base Amount: $<?php echo number_format((float)$bill['default_amount'], 2); ?><br>
-
-
-
-
-
 
 
         <?php if (!empty($bill['actual_due_date'])): ?>
@@ -228,10 +330,6 @@ require '_includes/nav.php';
         <?php endif; ?>
 
         Cadence: <?php echo htmlspecialchars((string)$bill['cadence'], ENT_QUOTES, 'UTF-8'); ?><br>
-
-
-
-
 
 
         Paid From:
@@ -256,8 +354,6 @@ require '_includes/nav.php';
 
 
 
-
-
       </div>
 
       <h2>Bill Activity</h2>
@@ -275,8 +371,23 @@ require '_includes/nav.php';
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($bill_activity as $row): ?>
+
+
+          <?php foreach ($bill_activity as $row): ?>
+            <?php
+            $event_type = $row['event_type'];
+            if ($event_type === 'amount_schedule_deleted') {
+              $event_type = 'Amount Rule Deleted';
+            } else {
+              $event_type = (string)($row['event_type'] ?? '');
+            }
+
+            $type_label = 'Activity';
+            $details = '';
+            ?>
+
               <tr>
+                <?php /* When */ ?>
                 <td>
                   <?php
                   echo !empty($row['event_datetime'])
@@ -285,98 +396,253 @@ require '_includes/nav.php';
                   ?>
                 </td>
 
+
+                <?php /* Type */ ?>
                 <td>
-                  <?php if ($row['event_source'] === 'payment'): ?>
-                    Payment
-
-                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
-                    Payment Adjustment
-
-                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'created'): ?>
-                    Created
-
-                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'updated'): ?>
-                    Edit
-
-                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'archived'): ?>
-                    Archived
-
-                  <?php elseif ($row['event_source'] === 'activity'): ?>
-                    Activity
-
-                  <?php else: ?>
-                    &nbsp;
-                  <?php endif; ?>
+                  <?php
+                  if ($event_type === 'payment') {
+                    echo 'Payment';
+                  } elseif ($event_type === 'payment_adjusted') {
+                    echo 'Payment Adjustment';
+                  } elseif ($event_type === 'created') {
+                    echo 'Created';
+                  } elseif ($event_type === 'updated') {
+                    echo 'Edit';
+                  } elseif ($event_type === 'archived') {
+                    echo 'Archived';
+                  } elseif ($event_type === 'amount_schedule_added') {
+                    echo 'Amount Rule Added';
+                  } else {
+                    echo 'Activity';
+                  }
+                  ?>
                 </td>
 
+
+                <?php /* Details */ ?>
                 <td>
-                  <?php if ($row['event_source'] === 'activity' && $row['label'] === 'payment_adjusted'): ?>
-                    $<?php echo number_format((float)$row['old_value'], 2); ?>
-                    &rarr;
-                    $<?php echo number_format((float)$row['new_value'], 2); ?>
+                  <?php
+                  if ($event_type === 'amount_schedule_deleted') {
+                    $details_data = json_decode(
+                      (string)($row['old_value'] ?? ''),
+                      true
+                    );
 
-                  <?php elseif ($row['event_source'] === 'activity' && $row['label'] === 'created'): ?>
-                    Billing account created
+                    if (is_array($details_data)) {
+                      $effective_due_date = (string)($details_data['effective_due_date'] ?? '');
+                      $scheduled_amount = (float)($details_data['amount'] ?? 0);
+                      $adjustment_type = (string)($details_data['adjustment_type'] ?? 'single');
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'default_amount'): ?>
-                    Amount due:
-                    $<?php echo number_format((float)$row['old_value'], 2); ?>
-                    &rarr;
-                    $<?php echo number_format((float)$row['new_value'], 2); ?>
+                      echo '$' . number_format($scheduled_amount, 2);
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'actual_due_date'): ?>
-                    Next calendar due date:
-                    <?php echo !empty($row['old_value']) ? date('m.d.y', strtotime((string)$row['old_value'])) : '—'; ?>
-                    &rarr;
-                    <?php echo !empty($row['new_value']) ? date('m.d.y', strtotime((string)$row['new_value'])) : '—'; ?>
+                      if ($effective_due_date !== '') {
+                        if ($adjustment_type === 'ongoing') {
+                          echo ' beginning ' .
+                            date('m.d.y', strtotime($effective_due_date)) .
+                            ' and continuing forward';
+                        } else {
+                          echo ' for ' .
+                            date('m.d.y', strtotime($effective_due_date)) .
+                            ' only';
+                        }
+                      }
+                    } else {
+                      echo 'Scheduled amount rule deleted';
+                    }
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'default_funding_account_id'): ?>
-                    Paid From Account
+                  } elseif ($event_type === 'amount_schedule_added') {
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'login_url'): ?>
-                    Login URL
+                    $details_data = json_decode(
+                      (string)($row['new_value'] ?? ''),
+                      true
+                    );
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'vendor_name'): ?>
-                    Vendor name
+                    if (is_array($details_data)) {
+                      $effective_due_date = (string)(
+                        $details_data['effective_due_date'] ?? ''
+                      );
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'billing_name'): ?>
-                    Billing account name
+                      $scheduled_amount = (float)(
+                        $details_data['amount'] ?? 0
+                      );
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'cadence'): ?>
-                    Cadence:
-                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
-                    &rarr;
-                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+                      $adjustment_type = (string)(
+                        $details_data['adjustment_type'] ?? 'single'
+                      );
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'due_day_of_month'): ?>
-                    Due day:
-                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
-                    &rarr;
-                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+                      echo '$' . number_format($scheduled_amount, 2);
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'due_month_of_year'): ?>
-                    Due month:
-                    <?php echo htmlspecialchars((string)$row['old_value'], ENT_QUOTES, 'UTF-8'); ?>
-                    &rarr;
-                    <?php echo htmlspecialchars((string)$row['new_value'], ENT_QUOTES, 'UTF-8'); ?>
+                      if ($effective_due_date !== '') {
+                        if ($adjustment_type === 'ongoing') {
+                          echo ' beginning ' .
+                            date('m.d.y', strtotime($effective_due_date)) .
+                            ' and continuing forward';
+                        } else {
+                          echo ' for ' .
+                            date('m.d.y', strtotime($effective_due_date)) .
+                            ' only';
+                        }
+                      }
+                    } else {
+                      echo 'Scheduled amount rule added';
+                    }
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'reserve_style'): ?>
-                    Reserve style:
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['old_value'])), ENT_QUOTES, 'UTF-8'); ?>
-                    &rarr;
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['new_value'])), ENT_QUOTES, 'UTF-8'); ?>
+                  } elseif ($event_type === 'payment_adjusted') {
+                    echo '$' . number_format((float)$row['old_value'], 2);
+                    echo ' &rarr; ';
+                    echo '$' . number_format((float)$row['new_value'], 2);
 
-                  <?php elseif ($row['event_source'] === 'activity' && (string)$row['field_name'] === 'is_active'): ?>
-                    Status:
-                    <?php echo ((string)$row['new_value'] === '1') ? 'Active' : 'Archived'; ?>
+                  } elseif ($event_type === 'created') {
+                    echo 'Billing account created';
 
-                  <?php elseif ($row['event_source'] === 'activity' && !empty($row['field_name'])): ?>
-                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$row['field_name'])), ENT_QUOTES, 'UTF-8'); ?>
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'default_amount'
+                  ) {
+                    echo 'Amount due: $' .
+                      number_format((float)$row['old_value'], 2) .
+                      ' &rarr; $' .
+                      number_format((float)$row['new_value'], 2);
 
-                  <?php else: ?>
-                    Payment recorded
-                  <?php endif; ?>
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'actual_due_date'
+                  ) {
+                    echo 'Next calendar due date: ';
+
+                    echo !empty($row['old_value'])
+                      ? date('m.d.y', strtotime((string)$row['old_value']))
+                      : '—';
+
+                    echo ' &rarr; ';
+
+                    echo !empty($row['new_value'])
+                      ? date('m.d.y', strtotime((string)$row['new_value']))
+                      : '—';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'default_funding_account_id'
+                  ) {
+                    echo 'Paid From Account';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'login_url'
+                  ) {
+                    echo 'Login URL';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'vendor_name'
+                  ) {
+                    echo 'Vendor name';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'billing_name'
+                  ) {
+                    echo 'Billing account name';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'cadence'
+                  ) {
+                    echo 'Cadence: ';
+                    echo htmlspecialchars(
+                      (string)$row['old_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+                    echo ' &rarr; ';
+                    echo htmlspecialchars(
+                      (string)$row['new_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'due_day_of_month'
+                  ) {
+                    echo 'Due day: ';
+                    echo htmlspecialchars(
+                      (string)$row['old_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+                    echo ' &rarr; ';
+                    echo htmlspecialchars(
+                      (string)$row['new_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'due_month_of_year'
+                  ) {
+                    echo 'Due month: ';
+                    echo htmlspecialchars(
+                      (string)$row['old_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+                    echo ' &rarr; ';
+                    echo htmlspecialchars(
+                      (string)$row['new_value'],
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'reserve_style'
+                  ) {
+                    echo 'Reserve style: ';
+
+                    echo htmlspecialchars(
+                      ucwords(str_replace('_', ' ', (string)$row['old_value'])),
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                    echo ' &rarr; ';
+
+                    echo htmlspecialchars(
+                      ucwords(str_replace('_', ' ', (string)$row['new_value'])),
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    (string)$row['field_name'] === 'is_active'
+                  ) {
+                    echo 'Status: ';
+                    echo ((string)$row['new_value'] === '1')
+                      ? 'Active'
+                      : 'Archived';
+
+                  } elseif (
+                    $event_type === 'updated' &&
+                    !empty($row['field_name'])
+                  ) {
+                    echo htmlspecialchars(
+                      ucwords(str_replace('_', ' ', (string)$row['field_name'])),
+                      ENT_QUOTES,
+                      'UTF-8'
+                    );
+
+                  } elseif ($event_type === 'payment') {
+                    echo 'Payment recorded';
+
+                  } else {
+                    echo 'Activity recorded';
+                  }
+                  ?>
                 </td>
+
 
                 <td>
                   <?php if ($row['amount'] !== null): ?>
@@ -392,7 +658,47 @@ require '_includes/nav.php';
                   <?php endif; ?>
                 </td>
 
-                <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+
+
+
+
+
+
+<td>
+  <?php
+  $note = (string)($row['note'] ?? '');
+  $paid_from_account = trim((string)($row['paid_from_account'] ?? ''));
+
+  if (
+    $paid_from_account !== '' &&
+    strpos($note, $paid_from_account) !== false
+  ) {
+    $parts = explode($paid_from_account, $note, 2);
+
+    echo htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8');
+    ?>
+
+    <a href="billing_projection.php?account=<?php echo urlencode($paid_from_account); ?>">
+      <?php echo htmlspecialchars($paid_from_account, ENT_QUOTES, 'UTF-8'); ?>
+    </a>
+
+    <?php
+    echo htmlspecialchars($parts[1] ?? '', ENT_QUOTES, 'UTF-8');
+
+  } else {
+    echo htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
+  }
+  ?>
+</td>
+
+
+
+
+
+
+
+
+
 
                 <td style="text-align: center;">
                   <a href="edit_note.php?source=<?php echo urlencode((string)$row['event_source']); ?>&id=<?php echo (int)$row['id']; ?>">
@@ -408,13 +714,134 @@ require '_includes/nav.php';
         <p>No activity recorded yet.</p>
       <?php endif; ?>
 
-      <h2>Scheduled Amounts</h2>
-      
+
+
+
+
+
+<div class="sepsec">
+  <h2>Override | Exception | Scheduled Amount</h2>
+
+  <p>
+    Sometimes you discover that a future bill amount will differ from the regular base amount.
+    Schedule one-off exceptions or ongoing amount changes here.
+  </p>
+
+  <div class="inner-links">
+    <a
+      class="btn-one"
+      href="add_bill_amount_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>"
+    >
+      Add
+    </a>
+  </div>
+
+  <?php if ($scheduled_amounts): ?>
+
+    <table class="full-width">
+      <thead>
+        <tr>
+          <th>Effective Due Date</th>
+          <th>Amount</th>
+          <th>Applies To</th>
+          <th>Note</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <?php foreach ($scheduled_amounts as $row): ?>
+          <?php
+          $adjustment_type = (string)($row['adjustment_type'] ?? 'single');
+
+          $type_label = $adjustment_type === 'ongoing'
+            ? 'This and future occurrences'
+            : 'This occurrence only';
+
+          $is_future_schedule = (string)$row['effective_due_date'] > date('Y-m-d');
+          ?>
+
+          <tr>
+            <td>
+              <?php echo date(
+                'm.d.y',
+                strtotime((string)$row['effective_due_date'])
+              ); ?>
+            </td>
+
+            <td>
+              $<?php echo number_format((float)$row['amount'], 2); ?>
+            </td>
+
+            <td>
+              <?php echo htmlspecialchars(
+                $type_label,
+                ENT_QUOTES,
+                'UTF-8'
+              ); ?>
+            </td>
+
+            <td>
+              <?php echo htmlspecialchars(
+                (string)($row['note'] ?? ''),
+                ENT_QUOTES,
+                'UTF-8'
+              ); ?>
+            </td>
+
+
+            <td>
+              <?php if ($is_future_schedule): ?>
+                <button
+                  type="button"
+                  class="delete-amount-schedule-trigger postnow-btn"
+                  data-schedule-id="<?php echo (int)$row['bill_amount_schedule_id']; ?>"
+                  data-effective-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$row['effective_due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-amount="<?php echo htmlspecialchars(number_format((float)$row['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
+                  data-applies-to="<?php echo htmlspecialchars($type_label, ENT_QUOTES, 'UTF-8'); ?>"
+                  data-note="<?php echo htmlspecialchars((string)($row['note'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"
+                >
+                  Delete
+                </button>
+              <?php else: ?>
+                Already effective
+              <?php endif; ?>
+            </td>
+
+
+
+
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p>No scheduled amount overrides yet.</p>
+  <?php endif; ?>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+<?php if ((string)$bill['cadence'] === 'custom'): ?>
+  <div class="diff-bgc">
+
+      <h2>Scheduled Due Events</h2>
+
       <div class="inner-links">
-        <a class="btn-one" href="add_bill_amount_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Scheduled Amount</a>
+        <a href="add_bill_due_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">
+          Add Due Event
+        </a>
       </div>
 
-      <?php if ($scheduled_amounts): ?>
+      <?php if ($custom_due_events): ?>
         <table class="full-width">
           <thead>
             <tr>
@@ -423,52 +850,46 @@ require '_includes/nav.php';
               <th>Note</th>
             </tr>
           </thead>
+
           <tbody>
-            <?php foreach ($scheduled_amounts as $row): ?>
+            <?php foreach ($custom_due_events as $row): ?>
               <tr>
-                <td><?php echo date('m.d.y', strtotime((string)$row['effective_due_date'])); ?></td>
-                <td>$<?php echo number_format((float)$row['amount'], 2); ?></td>
-                <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td>
+                  <?php echo date(
+                    'm.d.y',
+                    strtotime((string)$row['due_date'])
+                  ); ?>
+                </td>
+
+                <td>
+                  $<?php echo number_format((float)$row['amount'], 2); ?>
+                </td>
+
+                <td>
+                  <?php echo htmlspecialchars(
+                    (string)$row['note'],
+                    ENT_QUOTES,
+                    'UTF-8'
+                  ); ?>
+                </td>
               </tr>
             <?php endforeach; ?>
           </tbody>
         </table>
       <?php else: ?>
-        <p>No scheduled amount overrides yet.</p>
+        <p>No scheduled due events yet.</p>
       <?php endif; ?>
 
-      <div class="diff-bgc">
-        <?php if ((string)$bill['cadence'] === 'custom'): ?>
-          <h2>Scheduled Due Events</h2>
+  </div>
+<?php endif; ?>
 
-          <div class="inner-links">
-            <a href="add_bill_due_schedule.php?billing_account_id=<?php echo (int)$billing_account_id; ?>">Add Due Event</a>
-          </div>
 
-          <?php if ($custom_due_events): ?>
-            <table class="full-width">
-              <thead>
-                <tr>
-                  <th>Due Date</th>
-                  <th>Amount</th>
-                  <th>Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($custom_due_events as $row): ?>
-                  <tr>
-                    <td><?php echo date('m.d.y', strtotime((string)$row['due_date'])); ?></td>
-                    <td>$<?php echo number_format((float)$row['amount'], 2); ?></td>
-                    <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          <?php else: ?>
-            <p>No scheduled due events yet.</p>
-          <?php endif; ?>
-        <?php endif; ?>
-      </div>
+
+
+
+
+
+
 
       <h2>General Notes</h2>
 
@@ -527,5 +948,71 @@ require '_includes/nav.php';
 
   </div>
 </div>
+
+
+
+<?php /* modal for deleting scheduled override */ ?>
+<div class="confirm-modal" id="delete-amount-schedule-modal" aria-hidden="true">
+  <div class="confirm-modal__backdrop"></div>
+
+  <div class="confirm-modal__panel" role="dialog" aria-modal="true" aria-labelledby="delete-amount-schedule-title">
+    <button type="button" class="confirm-modal__close" id="delete-amount-schedule-close">
+      &times;
+    </button>
+
+    <h2 id="delete-amount-schedule-title">
+      Delete Scheduled Amount?
+    </h2>
+
+    <p>
+      This will remove the future scheduled amount rule. This does not affect past payments.
+    </p>
+
+    <div class="confirm-modal__details">
+      <div>
+        <strong>Effective Date:</strong>
+        <span id="delete-schedule-effective-date"></span>
+      </div>
+
+      <div>
+        <strong>Amount:</strong>
+        $<span id="delete-schedule-amount"></span>
+      </div>
+
+      <div>
+        <strong>Applies To:</strong>
+        <span id="delete-schedule-applies-to"></span>
+      </div>
+
+      <div id="delete-schedule-note-wrap" style="display:none;">
+        <strong>Note:</strong>
+        <span id="delete-schedule-note"></span>
+      </div>
+    </div>
+
+    <form method="post" id="delete-amount-schedule-form">
+      <input type="hidden" name="delete_amount_schedule" value="1">
+      <input type="hidden" name="billing_account_id" value="<?php echo (int)$billing_account_id; ?>">
+      <input type="hidden" name="bill_amount_schedule_id" id="delete-bill-amount-schedule-id" value="">
+
+      <div class="confirm-modal__actions">
+        <button type="button" class="btn-two" id="delete-amount-schedule-cancel">
+          Cancel
+        </button>
+
+        <button type="submit" class="btn-three">
+          Yes, Delete It
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+
+
+
+
+
 
 <?php require '_includes/footer.php'; ?>

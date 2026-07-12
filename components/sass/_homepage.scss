@@ -152,6 +152,14 @@ ul.funding-status-list {
 .hpc { /* homepage card */
   display: flex;
   flex-direction: column;
+  &.findbill {
+    /* find a bill */
+    margin-bottom: 1em;
+    // font-family: inherit;
+  }
+  &.fundneeded {
+    flex-grow: 1;
+  }
 }
 
 .dashboard-card h2 {
@@ -234,6 +242,18 @@ table.full-width {
     // text-align: right;
     padding-right: 0.5em;
   }
+  &.col {
+    /* this is currently only applied on the add_bill_amount_schedule.php page to the 'Applies To' section */
+    flex-direction: column;
+    margin: 1em 0 1.5em;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 5px;
+    label {
+      width: 100%;
+      margin-bottom: 0.5em;
+    }
+  }
 }
 .ded-red {
   color: red;
@@ -308,4 +328,37 @@ a.w-lnk {
     opacity: 1;
     text-decoration: none;
   }
+}
+
+/* bill search */
+.bill-search-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+
+}
+
+.bill-search-results {
+  margin-top: 1rem;
+}
+
+.bill-search-result {
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.bill-search-result__name {
+  font-weight: 700;
+}
+
+.bill-search-result__meta {
+  font-size: 0.9rem;
+  opacity: 0.75;
+  margin-top: 0.2rem;
+}
+
+.bill-search-empty {
+  margin-top: 1rem;
+  font-style: italic;
+  opacity: 0.75;
 }

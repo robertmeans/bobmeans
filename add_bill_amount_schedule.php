@@ -11,6 +11,7 @@ $errors = [];
 $billing_account_id = 0;
 $bill = null;
 $effective_due_date = '';
+$adjustment_type = '';
 $amount = '';
 $note = '';
 
@@ -44,12 +45,42 @@ if ($bill && $effective_due_date === '' && !empty($bill['actual_due_date']) && $
 
 if (is_post_request() && isset($_POST['save_bill_amount_schedule']) && $bill) {
   $effective_due_date = trim($_POST['effective_due_date'] ?? '');
+  $adjustment_type = trim($_POST['adjustment_type'] ?? 'single');
   $amount = str_replace(',', '', trim($_POST['amount'] ?? ''));
   $note = trim($_POST['note'] ?? '');
 
   if ($effective_due_date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $effective_due_date)) {
     $errors[] = 'Effective due date must be in YYYY-MM-DD format.';
   }
+
+
+
+  $allowed_adjustment_types = [
+    'single',
+    'ongoing'
+  ];
+  if (!in_array($adjustment_type, $allowed_adjustment_types, true)) {
+    $errors[] = 'Please select how this amount adjustment should apply.';
+  }
+  $stmt = $pdo_db->prepare("
+    SELECT bill_amount_schedule_id
+    FROM bill_amount_schedule
+    WHERE billing_account_id = ?
+      AND effective_due_date = ?
+      AND adjustment_type = ?
+    LIMIT 1
+  ");
+  $stmt->execute([
+    $billing_account_id,
+    $effective_due_date,
+    $adjustment_type
+  ]);
+
+  if ($stmt->fetchColumn()) {
+    $errors[] = 'An amount adjustment of this type already exists for that due date.';
+  }
+
+
 
 
   if (!$errors && !bill_schedule_date_matches_bill($bill, $effective_due_date)) {
@@ -67,31 +98,83 @@ if (is_post_request() && isset($_POST['save_bill_amount_schedule']) && $bill) {
   }
 
   if (!$errors) {
-    $stmt = $pdo_db->prepare("
-      INSERT INTO bill_amount_schedule (
-        billing_account_id,
-        user_id,
-        effective_due_date,
-        amount,
-        note,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?, NOW())
-      ON DUPLICATE KEY UPDATE
-        amount = VALUES(amount),
-        note = VALUES(note),
-        updated_at = NOW()
-    ");
-    $stmt->execute([
-      $billing_account_id,
-      $user_id,
-      $effective_due_date,
-      (float)$amount,
-      $note !== '' ? $note : null
-    ]);
 
-    header('Location: bill_details.php?billing_account_id=' . $billing_account_id);
-    exit();
+
+
+    $pdo_db->beginTransaction();
+
+    try {
+      $stmt = $pdo_db->prepare("
+        INSERT INTO bill_amount_schedule (
+          billing_account_id,
+          effective_due_date,
+          amount,
+          adjustment_type,
+          note
+        ) VALUES (?, ?, ?, ?, ?)
+      ");
+
+      $stmt->execute([
+        $billing_account_id,
+        $effective_due_date,
+        $amount,
+        $adjustment_type,
+        $note !== '' ? $note : null
+      ]);
+
+      $activity_details = [
+        'effective_due_date' => $effective_due_date,
+        'amount' => round((float)$amount, 2),
+        'adjustment_type' => $adjustment_type
+      ];
+
+      $stmt = $pdo_db->prepare("
+        INSERT INTO bill_activity_log (
+          billing_account_id,
+          user_id,
+          activity_type,
+          field_name,
+          old_value,
+          new_value,
+          note,
+          activity_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      ");
+
+      $stmt->execute([
+        $billing_account_id,
+        $user_id,
+        'amount_schedule_added',
+        'amount_schedule',
+        null,
+        json_encode($activity_details),
+        $note !== '' ? $note : null
+      ]);
+
+      $pdo_db->commit();
+
+      redirect_to(
+        'bill_details.php?billing_account_id=' .
+        $billing_account_id
+      );
+
+    } catch (Throwable $e) {
+      if ($pdo_db->inTransaction()) {
+        $pdo_db->rollBack();
+      }
+
+      error_log(
+        'Scheduled amount creation failed for billing_account_id ' .
+        $billing_account_id .
+        ': ' .
+        $e->getMessage()
+      );
+
+      $errors[] = 'The scheduled amount could not be saved.';
+    }
+
   }
+
 }
 
 require '_includes/header.php';
@@ -133,6 +216,38 @@ require '_includes/nav.php';
           <label for="effective_due_date">Effective Due Date</label>
           <input type="date" id="effective_due_date" name="effective_due_date" value="<?php echo htmlspecialchars($effective_due_date, ENT_QUOTES, 'UTF-8'); ?>" required>
         </div>
+
+
+
+
+<div class="row col">
+  <label>Applies To:</label>
+
+  <label>
+    <input
+      type="radio"
+      name="adjustment_type"
+      value="single"
+      <?php echo $adjustment_type === 'single' ? 'checked' : ''; ?>
+    >
+    This due date only
+  </label>
+
+  <label>
+    <input
+      type="radio"
+      name="adjustment_type"
+      value="ongoing"
+      <?php echo $adjustment_type === 'ongoing' ? 'checked' : ''; ?>
+    >
+    This due date and all future occurrences
+  </label>
+</div>
+
+
+
+
+
 
         <div class="row">
           <label for="amount">Amount</label>

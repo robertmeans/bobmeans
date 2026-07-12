@@ -253,6 +253,31 @@ usort($coverage_horizon, function ($a, $b) {
 
 $multiple_coverage_accounts = count($coverage_horizon) > 1;
 
+
+$stmt = $pdo_db->prepare("
+  SELECT
+    ba.billing_account_id,
+    ba.billing_name,
+    ba.vendor_name,
+    ba.login_url,
+    ba.default_funding_account_id,
+    fa.account_name AS funding_account
+  FROM billing_accounts ba
+  LEFT JOIN funding_accounts fa
+    ON ba.default_funding_account_id = fa.funding_account_id
+  WHERE ba.user_id = ?
+    AND ba.is_active = 1
+  ORDER BY ba.billing_name ASC
+");
+
+$stmt->execute([$user_id]);
+$bill_search_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+
+
+
+
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -494,29 +519,135 @@ require '_includes/nav.php';
 
 
 
+
+
+
+
+
+
+
       <div class="hpc">
-        <div class="card-title">
-          Funding Needed by Month
-        </div>
-        <div class="dashboard-card w-title">
-          
-          <?php
 
-          $months_to_show = 4;
-          $monthly_needed_totals_display = array_slice($monthly_needed_totals, 0, $months_to_show, true);
+        <div class="hpc findbill">
+          <div class="card-title">
+            Find a Bill
+          </div>
 
-          if ($monthly_needed_totals): ?>
-            <?php foreach ($monthly_needed_totals_display as $month_key => $amount): ?>
-              <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
-                <strong><?php echo date('F', strtotime($month_key . '-01')); ?>:</strong>
-                $<?php echo number_format($amount, 2); ?>
+          <div class="dashboard-card w-title">
+            <label for="bill-search" class="screen-reader-text">
+              Search bills
+            </label>
+
+            <input
+              type="search"
+              id="bill-search"
+              class="bill-search-input"
+              placeholder="Search by bill or vendor..."
+              autocomplete="off"
+            >
+
+            <div id="bill-search-results" class="bill-search-results" hidden>
+              <?php foreach ($bill_search_rows as $row): ?>
+                <?php
+                $billing_name = (string)($row['billing_name'] ?? '');
+                $vendor_name = (string)($row['vendor_name'] ?? '');
+                $funding_account = (string)($row['funding_account'] ?? '');
+
+                $search_text = strtolower(trim(
+                  $billing_name . ' ' .
+                  $vendor_name
+                ));
+                ?>
+
+                <div
+                  class="bill-search-result"
+                  data-search="<?php echo htmlspecialchars($search_text, ENT_QUOTES, 'UTF-8'); ?>"
+                >
+                  <div class="bill-search-result__name">
+                    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
+                      <?php echo htmlspecialchars($billing_name, ENT_QUOTES, 'UTF-8'); ?>
+                    </a>
+                  </div>
+
+                  <div class="bill-search-result__meta">
+                    <?php if ($vendor_name !== ''): ?>
+                      Vendor:
+                      <?php echo htmlspecialchars($vendor_name, ENT_QUOTES, 'UTF-8'); ?>
+                    <?php endif; ?>
+
+                    <?php if ($funding_account !== ''): ?>
+                      <?php if ($vendor_name !== ''): ?> | <?php endif; ?>
+                      Paid From:
+                      <?php echo htmlspecialchars($funding_account, ENT_QUOTES, 'UTF-8'); ?>
+                    <?php endif; ?>
+                  </div>
+
+                  <div class="mct">
+                    <a href="bill_details.php?billing_account_id=<?php echo (int)$row['billing_account_id']; ?>">
+                      details
+                    </a>
+
+                    <?php if (!empty($row['login_url'])): ?>
+                      |
+                      <a
+                        href="<?php echo htmlspecialchars((string)$row['login_url'], ENT_QUOTES, 'UTF-8'); ?>"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        website
+                      </a>
+                    <?php endif; ?>
+
+                    <?php if ($funding_account !== ''): ?>
+                      |
+                      <a href="billing_projection.php?account=<?php echo urlencode($funding_account); ?>">
+                        projection
+                      </a>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+
+              <div id="bill-search-empty" class="bill-search-empty" hidden>
+                No matching bills found.
               </div>
-            <?php endforeach; ?>
-          <?php else: ?>
-            <p>No projected shortfalls found.</p>
-          <?php endif; ?>
+            </div>
+          </div>
         </div>
+
+
+
+
+
+
+        <div class="hpc fundneeded">
+          <div class="card-title">
+            Funding Needed by Month
+          </div>
+          <div class="dashboard-card w-title">
+            
+            <?php
+
+            $months_to_show = 4;
+            $monthly_needed_totals_display = array_slice($monthly_needed_totals, 0, $months_to_show, true);
+
+            if ($monthly_needed_totals): ?>
+              <?php foreach ($monthly_needed_totals_display as $month_key => $amount): ?>
+                <div class="dashboard-line<?php if (number_format($amount, 2) === '0.00') { echo ' green'; } ?>">
+                  <strong><?php echo date('F', strtotime($month_key . '-01')); ?>:</strong>
+                  $<?php echo number_format($amount, 2); ?>
+                </div>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <p>No projected shortfalls found.</p>
+            <?php endif; ?>
+          </div>
+        </div>
+
+
       </div>
+
+
 
     </div><?php /* .dashboard-grid */ ?>
 
@@ -653,7 +784,44 @@ require '_includes/nav.php';
                     </a>
                   </td>
 
-                  <td><?php echo htmlspecialchars((string)$row['note'], ENT_QUOTES, 'UTF-8'); ?></td>
+
+
+
+
+
+<td>
+  <?php
+  $note = (string)($row['note'] ?? '');
+  $paid_from_account = trim((string)($row['paid_from_account'] ?? ''));
+
+  if (
+    $paid_from_account !== '' &&
+    strpos($note, $paid_from_account) !== false
+  ) {
+    $parts = explode($paid_from_account, $note, 2);
+
+    echo htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8');
+    ?>
+
+    <a href="billing_projection.php?account=<?php echo urlencode($paid_from_account); ?>">
+      <?php echo htmlspecialchars($paid_from_account, ENT_QUOTES, 'UTF-8'); ?>
+    </a>
+
+    <?php
+    echo htmlspecialchars($parts[1] ?? '', ENT_QUOTES, 'UTF-8');
+
+  } else {
+    echo htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
+  }
+  ?>
+</td>
+
+
+
+
+
+
+                  
                 </tr>
               <?php endforeach; ?>
             </tbody>

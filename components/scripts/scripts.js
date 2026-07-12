@@ -433,3 +433,127 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 });
+
+/* modal for deleting scheduled overrides on bill_details.php page */ 
+document.addEventListener('DOMContentLoaded', function () {
+  const modal = document.getElementById('delete-amount-schedule-modal');
+  const closeBtn = document.getElementById('delete-amount-schedule-close');
+  const cancelBtn = document.getElementById('delete-amount-schedule-cancel');
+  const backdrop = modal ? modal.querySelector('.confirm-modal__backdrop') : null;
+
+  const scheduleIdInput = document.getElementById('delete-bill-amount-schedule-id');
+  const effectiveDateEl = document.getElementById('delete-schedule-effective-date');
+  const amountEl = document.getElementById('delete-schedule-amount');
+  const appliesToEl = document.getElementById('delete-schedule-applies-to');
+  const noteWrap = document.getElementById('delete-schedule-note-wrap');
+  const noteEl = document.getElementById('delete-schedule-note');
+
+  function openModal(button) {
+    if (!modal) return;
+
+    scheduleIdInput.value = button.dataset.scheduleId || '';
+    effectiveDateEl.textContent = button.dataset.effectiveDate || '';
+    amountEl.textContent = button.dataset.amount || '';
+    appliesToEl.textContent = button.dataset.appliesTo || '';
+
+    const note = button.dataset.note || '';
+
+    if (note !== '') {
+      noteEl.textContent = note;
+      noteWrap.style.display = '';
+    } else {
+      noteEl.textContent = '';
+      noteWrap.style.display = 'none';
+    }
+
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    if (!modal) return;
+
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+
+    scheduleIdInput.value = '';
+  }
+
+  document.querySelectorAll('.delete-amount-schedule-trigger').forEach(function (button) {
+    button.addEventListener('click', function () {
+      openModal(button);
+    });
+  });
+
+  [closeBtn, cancelBtn, backdrop].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener('click', closeModal);
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (
+      event.key === 'Escape' &&
+      modal &&
+      modal.classList.contains('is-open')
+    ) {
+      closeModal();
+    }
+  });
+});
+
+/* homepage bill search */
+document.addEventListener('DOMContentLoaded', function () {
+  const input = document.getElementById('bill-search');
+  const resultsWrap = document.getElementById('bill-search-results');
+  const emptyMessage = document.getElementById('bill-search-empty');
+
+  if (!input || !resultsWrap) return;
+
+  const results = Array.from(
+    resultsWrap.querySelectorAll('.bill-search-result')
+  );
+
+  function normalize(value) {
+    return value.toLowerCase().trim();
+  }
+
+  function updateResults() {
+    const query = normalize(input.value);
+    let visibleCount = 0;
+
+    if (query.length < 2) {
+      resultsWrap.hidden = true;
+
+      results.forEach(function (result) {
+        result.hidden = true;
+      });
+
+      if (emptyMessage) {
+        emptyMessage.hidden = true;
+      }
+
+      return;
+    }
+
+    resultsWrap.hidden = false;
+
+    results.forEach(function (result) {
+      const searchText = result.dataset.search || '';
+      const isMatch = searchText.includes(query);
+
+      result.hidden = !isMatch;
+
+      if (isMatch) {
+        visibleCount++;
+      }
+    });
+
+    if (emptyMessage) {
+      emptyMessage.hidden = visibleCount > 0;
+    }
+  }
+
+  input.addEventListener('input', updateResults);
+});

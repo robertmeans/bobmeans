@@ -127,9 +127,11 @@ button {
 .errors,
 .success {
   display: flex;
-  margin: 1em 0;  
-  padding: 1em;
-  width: 100%;
+  margin: 1em 0em;  
+  padding: 1em 5em 1em 1em;
+  border-radius: 8px;
+  width: fit-content;
+  // width: 100%;
 }
 .errors {
   background-color: #c63d3d;
