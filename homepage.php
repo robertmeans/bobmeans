@@ -198,18 +198,13 @@ $stmt = $pdo_db->prepare("
   LEFT JOIN billing_accounts ba
     ON bp.billing_account_id = ba.billing_account_id
   WHERE bp.user_id = ?
+  AND bp.status = 'paid'
+  AND bp.voided_at IS NULL
   ORDER BY bp.date_paid DESC, bp.bill_payment_id DESC
   LIMIT 5
 ");
 $stmt->execute([$user_id]);
 $recent_payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-
-
-
-
-
 
 
 $coverage_horizon = [];
@@ -745,6 +740,19 @@ require '_includes/nav.php';
         <?php endif; ?>
       </div>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
       <div class="dashboard-card wide-card">
         <h2>Recent Payments</h2>
 
@@ -784,44 +792,33 @@ require '_includes/nav.php';
                     </a>
                   </td>
 
+                  <td>
+                    <?php
+                    $note = (string)($row['note'] ?? '');
+                    $paid_from_account = trim((string)($row['paid_from_account'] ?? ''));
 
+                    if (
+                      $paid_from_account !== '' &&
+                      strpos($note, $paid_from_account) !== false
+                    ) {
+                      $parts = explode($paid_from_account, $note, 2);
 
+                      echo htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8');
+                      ?>
 
+                      <a href="billing_projection.php?account=<?php echo urlencode($paid_from_account); ?>">
+                        <?php echo htmlspecialchars($paid_from_account, ENT_QUOTES, 'UTF-8'); ?>
+                      </a>
 
+                      <?php
+                      echo htmlspecialchars($parts[1] ?? '', ENT_QUOTES, 'UTF-8');
 
-<td>
-  <?php
-  $note = (string)($row['note'] ?? '');
-  $paid_from_account = trim((string)($row['paid_from_account'] ?? ''));
+                    } else {
+                      echo htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
+                    }
+                    ?>
+                  </td>
 
-  if (
-    $paid_from_account !== '' &&
-    strpos($note, $paid_from_account) !== false
-  ) {
-    $parts = explode($paid_from_account, $note, 2);
-
-    echo htmlspecialchars($parts[0], ENT_QUOTES, 'UTF-8');
-    ?>
-
-    <a href="billing_projection.php?account=<?php echo urlencode($paid_from_account); ?>">
-      <?php echo htmlspecialchars($paid_from_account, ENT_QUOTES, 'UTF-8'); ?>
-    </a>
-
-    <?php
-    echo htmlspecialchars($parts[1] ?? '', ENT_QUOTES, 'UTF-8');
-
-  } else {
-    echo htmlspecialchars($note, ENT_QUOTES, 'UTF-8');
-  }
-  ?>
-</td>
-
-
-
-
-
-
-                  
                 </tr>
               <?php endforeach; ?>
             </tbody>
@@ -830,6 +827,16 @@ require '_includes/nav.php';
           <p>No recent bill activity yet.</p>
         <?php endif; ?>
       </div>
+
+
+
+
+
+
+
+
+
+
 
       <div class="dashboard-card wide-card">
         <h2>Recent Account Adjustments</h2>

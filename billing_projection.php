@@ -370,7 +370,7 @@ require '_includes/nav.php';
             $today_for_compare = new DateTime('today');
             $event_due_date = new DateTime((string)$event['due_date']);
             $event_due_date->setTime(0, 0, 0);
-            $is_early_process = ($event_due_date > $today_for_compare);
+            $is_early = ($event_due_date > $today_for_compare);
             ?>
             <form method="post" class="process-now-form" style="margin:0;">
               <input type="hidden" name="process_now" value="1">
@@ -378,17 +378,61 @@ require '_includes/nav.php';
               <input type="hidden" name="billing_account_id" value="<?php echo (int)$event['billing_account_id']; ?>">
               <input type="hidden" name="due_date" value="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>">
 
-              <button
-                type="button"
-                class="postnow-btn process-now-trigger"
-                data-bill-name="<?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>"
-                data-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
-                data-amount="<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
-                data-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
-                data-is-early="<?php echo $is_early_process ? '1' : '0'; ?>"
-              >
-                <?php echo $is_early_process ? 'Process Early' : 'Process Now'; ?>
-              </button>
+
+
+
+
+
+
+
+<?php /*
+<button
+  type="button"
+  class="postnow-btn process-now-trigger"
+  data-bill-name="<?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>"
+  data-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
+  data-amount="<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
+  data-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
+  data-is-early="<?php echo $is_early_process ? '1' : '0'; ?>"
+>
+  <?php echo $is_early_process ? 'Process Early' : 'Process Now'; ?>
+</button>
+*/ ?>
+
+<button
+  type="button"
+  class="js-app-modal-trigger postnow-btn"
+  data-modal-title="<?php echo $is_early ? 'Process Bill Early?' : 'Process Bill Now?'; ?>"
+  data-modal-lead="You’re about to manually process <?php echo htmlspecialchars((string)$event['billing_name'], ENT_QUOTES, 'UTF-8'); ?>."
+  data-modal-warning="<?php echo $is_early ? 'This bill is scheduled for a future due date and will be processed ahead of schedule. The payment and funding deduction will be recorded today, while the scheduled due date remains part of the record.' : ''; ?>"
+  data-modal-note="This will deduct funds now, record a payment, and advance the bill."
+  data-modal-confirm-text="<?php echo $is_early ? 'Yes, Process Early' : 'Yes, Process Now'; ?>"
+  data-modal-variant="<?php echo $is_early ? 'warning' : ''; ?>"
+  data-modal-action="billing_projection.php?account=<?php echo urlencode($selected_account); ?>"
+  data-modal-method="post"
+  data-modal-ajax="1"
+  data-modal-hidden-process-now="1"
+  data-modal-hidden-ajax="1"
+  data-modal-hidden-billing-account-id="<?php echo (int)$event['billing_account_id']; ?>"
+  data-modal-hidden-due-date="<?php echo htmlspecialchars((string)$event['due_date'], ENT_QUOTES, 'UTF-8'); ?>"
+  data-modal-detail-funding-account="<?php echo htmlspecialchars((string)$selected_account, ENT_QUOTES, 'UTF-8'); ?>"
+  data-modal-detail-amount="$<?php echo htmlspecialchars(number_format((float)$event['amount'], 2), ENT_QUOTES, 'UTF-8'); ?>"
+  data-modal-detail-scheduled-due-date="<?php echo htmlspecialchars(date('m.d.y', strtotime((string)$event['due_date'])), ENT_QUOTES, 'UTF-8'); ?>"
+>
+  <?php echo $is_early ? 'Process Early' : 'Process Now'; ?>
+</button>
+
+
+
+
+
+
+
+
+
+
+
+
             </form>
           <?php else: ?>
             &nbsp;
@@ -416,45 +460,6 @@ require '_includes/nav.php';
       <a href="intake_funding-accounts.php">Add New Funding</a>
     </div>
 
-  </div>
-</div>
-
-<div id="process-now-modal" class="confirm-modal" aria-hidden="true">
-  <div class="confirm-modal__backdrop"></div>
-
-  <div class="confirm-modal__panel" role="dialog" aria-modal="true" aria-labelledby="process-now-title">
-    <button type="button" class="confirm-modal__close" id="process-now-close" aria-label="Close">
-      &times;
-    </button>
-
-    <div class="confirm-modal__icon">!</div>
-
-    <h2 id="process-now-title">Process Bill Now?</h2>
-
-    <p class="confirm-modal__lead">
-      You’re about to manually process <strong id="modal-bill-name">this bill</strong>.
-    </p>
-
-    <div class="confirm-modal__details">
-      <div><span>Funding Account:</span> <strong id="modal-account-name"></strong></div>
-      <div><span>Amount:</span> <strong>$<span id="modal-amount"></span></strong></div>
-      <div><span>Scheduled Due Date:</span> <strong id="modal-due-date"></strong></div>
-    </div>
-
-    <p class="confirm-modal__warning" id="modal-early-warning" style="display:none;">
-      This bill is scheduled for a future due date and will be processed ahead of schedule. The payment and funding deduction will be recorded today, while the scheduled due date remains part of the record.
-    </p>
-
-    <p class="confirm-modal__note">
-      This will deduct funds now, record a payment, and advance the bill.
-    </p>
-
-    <div class="confirm-modal__error" id="process-now-error" style="display:none;"></div>
-
-    <div class="confirm-modal__actions">
-      <button type="button" class="btn-two" id="process-now-cancel">Cancel</button>
-      <button type="button" class="btn-three confirm-modal__confirm" id="process-now-confirm">Yes, Process Now</button>
-    </div>
   </div>
 </div>
 

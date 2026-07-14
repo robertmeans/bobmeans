@@ -13,6 +13,11 @@ function bob() { /* President = 99 | There should be only 1 President */
   } else { return false; }
 }
 
+function modal_page($layout_context, $is_modal_page) {
+  /* $is_modal_page array is in config/initialize.php */
+  return in_array($layout_context, $is_modal_page, true);
+}
+
 function u($string="") {
   return urlencode($string);
 }

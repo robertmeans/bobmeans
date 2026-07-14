@@ -7,7 +7,8 @@ module.exports = function(grunt) {
       my_target: {
         files: {
           '_scripts/scripts.js': ['components/scripts/scripts.js'],
-          '_scripts/auth-scripts.js': ['components/scripts/auth-scripts.js']
+          '_scripts/auth-scripts.js': ['components/scripts/auth-scripts.js'],
+          '_scripts/app-modal.js': ['components/scripts/app-modal.js']
         } //files
       } //my_target
     }, //uglify   

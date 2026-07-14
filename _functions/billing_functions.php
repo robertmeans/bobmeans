@@ -396,8 +396,12 @@ function apply_pool_to_projected_events(array $events, float $pool_amount): arra
 }
 
 
-function payment_already_recorded(PDO $pdo_db, int $billing_account_id, int $user_id, string $due_date): bool
-{
+function payment_already_recorded(
+  PDO $pdo_db, 
+  int $billing_account_id, 
+  int $user_id, 
+  string $due_date
+): bool {
   $stmt = $pdo_db->prepare("
     SELECT bill_payment_id
     FROM bill_payments
@@ -405,9 +409,14 @@ function payment_already_recorded(PDO $pdo_db, int $billing_account_id, int $use
       AND user_id = ?
       AND due_date = ?
       AND status = 'paid'
+      AND voided_at IS NULL
     LIMIT 1
   ");
-  $stmt->execute([$billing_account_id, $user_id, $due_date]);
+  $stmt->execute([
+    $billing_account_id, 
+    $user_id, 
+    $due_date
+  ]);
 
   return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
 }
@@ -1602,6 +1611,7 @@ function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_
     SELECT
       bill_activity_log_id,
       activity_date AS event_datetime,
+      activity_date AS sort_datetime,
       'activity' AS event_source,
       activity_type,
       field_name,
@@ -1619,6 +1629,7 @@ function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_
     $timeline[] = [
       'id' => (int)$row['bill_activity_log_id'],
       'event_datetime' => $row['event_datetime'],
+      'sort_datetime' => $row['sort_datetime'],
       'event_source' => 'activity',
       'event_type' => (string)$row['activity_type'],
       'label' => (string)$row['activity_type'],
@@ -1626,7 +1637,10 @@ function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_
       'old_value' => $row['old_value'],
       'new_value' => $row['new_value'],
       'amount' => null,
-      'note' => $row['note']
+      'note' => $row['note'],
+      'due_date' => null,
+      'funding_account_id' => null,
+      'paid_from_account' => null
     ];
   }
 
@@ -1634,44 +1648,62 @@ function bill_activity_timeline(PDO $pdo_db, int $user_id, int $billing_account_
     payment entries
   */
   $stmt = $pdo_db->prepare("
-  SELECT
-    bp.bill_payment_id,
-    CONCAT(bp.date_paid, ' 12:00:00') AS event_datetime,
-    bp.amount_paid,
-    bp.confirmation_note,
-    fa.account_name AS paid_from_account
-  FROM bill_payments bp
-  LEFT JOIN funding_accounts fa
-    ON bp.funding_account_id = fa.funding_account_id
-  WHERE bp.billing_account_id = ?
-    AND bp.user_id = ?
-    AND bp.status = 'paid'
+    SELECT
+      bp.bill_payment_id,
+      CONCAT(bp.date_paid, ' 12:00:00') AS event_datetime,
+      bp.created_at AS sort_datetime,
+      bp.due_date,
+      bp.amount_paid,
+      bp.funding_account_id,
+      bp.confirmation_note,
+      bp.status,
+      bp.voided_at,
+      bp.voided_reason,
+      fa.account_name AS paid_from_account
+    FROM bill_payments bp
+    LEFT JOIN funding_accounts fa
+      ON bp.funding_account_id = fa.funding_account_id
+    WHERE bp.billing_account_id = ?
+      AND bp.user_id = ?
+      AND bp.status IN ('paid', 'voided')
   ");
+
   $stmt->execute([$billing_account_id, $user_id]);
   $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
   foreach ($rows as $row) {
+    $is_voided = ((string)$row['status'] === 'voided');
+
     $timeline[] = [
       'id' => (int)$row['bill_payment_id'],
       'event_datetime' => $row['event_datetime'],
+      'sort_datetime' => $row['sort_datetime'],
       'event_source' => 'payment',
-      'event_type' => 'payment',
-      'label' => 'payment',
+      'event_type' => $is_voided ? 'payment_voided' : 'payment',
+      'label' => $is_voided ? 'payment_voided' : 'payment',
       'field_name' => null,
       'old_value' => null,
       'new_value' => null,
       'amount' => (float)$row['amount_paid'],
       'note' => $row['confirmation_note'],
-      'paid_from_account' => $row['paid_from_account']
+      'due_date' => $row['due_date'],
+      'funding_account_id' => $row['funding_account_id'],
+      'paid_from_account' => $row['paid_from_account'],
+      'status' => $row['status'],
+      'voided_at' => $row['voided_at'],
+      'voided_reason' => $row['voided_reason']
     ];
   }
 
   usort($timeline, function ($a, $b) {
-    if ($a['event_datetime'] === $b['event_datetime']) {
-      return strcmp((string)$a['label'], (string)$b['label']);
+    $sort_a = (string)($a['sort_datetime'] ?? $a['event_datetime'] ?? '');
+    $sort_b = (string)($b['sort_datetime'] ?? $b['event_datetime'] ?? '');
+
+    if ($sort_a === $sort_b) {
+      return ((int)($b['id'] ?? 0)) <=> ((int)($a['id'] ?? 0));
     }
 
-    return strcmp((string)$b['event_datetime'], (string)$a['event_datetime']);
+    return strcmp($sort_b, $sort_a);
   });
 
   return $timeline;
