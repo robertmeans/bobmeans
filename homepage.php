@@ -283,6 +283,7 @@ require '_includes/nav.php';
     <!-- <h1 style="color:#fff;">Dashboard</h1> -->
 
     <div class="inner-links">
+      <?php if ($user_id === '1') { echo 'My account! | '; } ?>
       <a href="billing_projection.php">Projection</a> |
       <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
       <a href="funding_account_ledger.php">Funding Account Ledger</a>
