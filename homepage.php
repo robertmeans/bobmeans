@@ -268,11 +268,6 @@ $stmt = $pdo_db->prepare("
 $stmt->execute([$user_id]);
 $bill_search_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-
-
-
-
-
 require '_includes/header.php';
 require '_includes/nav.php';
 ?>
@@ -288,17 +283,6 @@ require '_includes/nav.php';
       <a href="reserve_adjustment.php">Reserve Adjustment</a> | 
       <a href="funding_account_ledger.php">Funding Account Ledger</a>
     </div><?php /* .inner-links */ ?>
-
-
-
-
-
-
-
-
-
-
-
 
 
     <div class="dashboard-grid">
@@ -392,6 +376,14 @@ require '_includes/nav.php';
         </div>
 
         <div class="dashboard-card w-title">
+
+
+<?php /* testing */
+// echo funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id) . '<br>';
+// echo funding_account_available_for_bills_by_id($pdo_db, $user_id, $funding_account_id);
+?>
+
+
 
           <?php if ($coverage_horizon): ?>
 

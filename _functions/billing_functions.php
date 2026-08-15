@@ -483,7 +483,7 @@ function process_single_due_draft(
     return false;
   }
 
-  $current_pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+  $current_pool_balance = funding_account_available_for_bills_by_id($pdo_db, $user_id, $funding_account_id);
 
   if ($current_pool_balance < $amount) {
     return false;
@@ -1344,6 +1344,158 @@ function funding_account_pool_balance_by_id(PDO $pdo_db, int $user_id, int $fund
   return round((float)($row['balance'] ?? 0), 2);
 }
 
+function active_savings_goal_total_for_funding_account(
+  PDO $pdo_db,
+  int $user_id,
+  int $funding_account_id
+): float {
+  $stmt = $pdo_db->prepare("
+    SELECT
+      COALESCE(SUM(
+        CASE
+          WHEN sgt.transaction_type IN ('contribution', 'adjustment') THEN sgt.amount
+          WHEN sgt.transaction_type IN ('release', 'spend') THEN -sgt.amount
+          ELSE 0
+        END
+      ), 0) AS total_set_aside
+    FROM funding_account_savings_goals sg
+    LEFT JOIN funding_account_savings_goal_transactions sgt
+      ON sg.savings_goal_id = sgt.savings_goal_id
+    WHERE sg.funding_account_id = ?
+      AND sg.user_id = ?
+      AND sg.status = 'active'
+  ");
+
+  $stmt->execute([
+    $funding_account_id,
+    $user_id
+  ]);
+
+  return round((float)$stmt->fetchColumn(), 2);
+}
+
+function funding_account_available_for_bills_by_id(
+  PDO $pdo_db,
+  int $user_id,
+  int $funding_account_id
+): float {
+  $actual_balance = funding_account_pool_balance_by_id(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
+  $savings_goal_total = active_savings_goal_total_for_funding_account(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
+  return round($actual_balance - $savings_goal_total, 2);
+}
+
+function active_savings_goals_for_funding_account(
+  PDO $pdo_db,
+  int $user_id,
+  int $funding_account_id
+): array {
+  $stmt = $pdo_db->prepare("
+    SELECT
+      sg.savings_goal_id,
+      sg.funding_account_id,
+      sg.user_id,
+      sg.goal_name,
+      sg.target_amount,
+      sg.note,
+      sg.status,
+      sg.created_at,
+      COALESCE(SUM(
+        CASE
+          WHEN sgt.transaction_type IN ('contribution', 'adjustment') THEN sgt.amount
+          WHEN sgt.transaction_type IN ('release', 'spend') THEN -sgt.amount
+          ELSE 0
+        END
+      ), 0) AS current_amount
+    FROM funding_account_savings_goals sg
+    LEFT JOIN funding_account_savings_goal_transactions sgt
+      ON sg.savings_goal_id = sgt.savings_goal_id
+    WHERE sg.funding_account_id = ?
+      AND sg.user_id = ?
+      AND sg.status = 'active'
+    GROUP BY
+      sg.savings_goal_id,
+      sg.funding_account_id,
+      sg.user_id,
+      sg.goal_name,
+      sg.target_amount,
+      sg.note,
+      sg.status,
+      sg.created_at
+    ORDER BY sg.created_at DESC, sg.savings_goal_id DESC
+  ");
+
+  $stmt->execute([
+    $funding_account_id,
+    $user_id
+  ]);
+
+  return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function funding_account_bill_availability_summary(
+  PDO $pdo_db,
+  int $user_id,
+  int $funding_account_id
+): array {
+  $actual_balance = funding_account_pool_balance_by_id(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
+  $savings_goal_total = active_savings_goal_total_for_funding_account(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
+  $available_for_bills = round(
+    $actual_balance - $savings_goal_total,
+    2
+  );
+
+  return [
+    'actual_balance' => round($actual_balance, 2),
+    'savings_goal_total' => round($savings_goal_total, 2),
+    'available_for_bills' => $available_for_bills
+  ];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function next_attention_date_for_bill(
   PDO $pdo_db,
   int $user_id,
@@ -1383,10 +1535,10 @@ function next_attention_date_for_bill(
     return null;
   }
 
-  $pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+  $available_for_bills = funding_account_available_for_bills_by_id($pdo_db, $user_id, $funding_account_id);
 
   $events = generate_projected_bill_events($pdo_db, $rows_for_account, $months_ahead);
-  $projection = apply_pool_to_projected_events($events, $pool_balance);
+  $projection = apply_pool_to_projected_events($events, $available_for_bills);
 
   foreach ($projection['events'] as $event) {
     if (
@@ -2258,7 +2410,7 @@ function process_bill_now(PDO $pdo_db, int $user_id, int $billing_account_id, st
     ];
   }
 
-  $current_pool_balance = funding_account_pool_balance_by_id($pdo_db, $user_id, $funding_account_id);
+  $current_pool_balance = funding_account_available_for_bills_by_id($pdo_db, $user_id, $funding_account_id);
   if ($current_pool_balance < $amount) {
     return [
       'success' => false,
@@ -2375,3 +2527,31 @@ function coverage_horizon_for_account(
     'has_active_bills' => true
   ];
 }
+
+function savings_goal_current_balance(
+  PDO $pdo_db,
+  int $user_id,
+  int $savings_goal_id
+): float {
+  $stmt = $pdo_db->prepare("
+    SELECT
+      COALESCE(SUM(
+        CASE
+          WHEN transaction_type IN ('contribution', 'adjustment') THEN amount
+          WHEN transaction_type IN ('release', 'spend') THEN -amount
+          ELSE 0
+        END
+      ), 0) AS balance
+    FROM funding_account_savings_goal_transactions
+    WHERE savings_goal_id = ?
+      AND user_id = ?
+  ");
+
+  $stmt->execute([
+    $savings_goal_id,
+    $user_id
+  ]);
+
+  return round((float)$stmt->fetchColumn(), 2);
+}
+

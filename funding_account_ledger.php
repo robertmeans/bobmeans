@@ -71,6 +71,19 @@ if ($funding_account_id < 1) {
 if ($funding_account) {
   $ledger_rows = funding_account_ledger_with_running_balance($pdo_db, $user_id, $funding_account_id);
   $current_balance = funding_account_current_balance_from_ledger($pdo_db, $user_id, $funding_account_id);
+
+  $funding_summary = funding_account_bill_availability_summary(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
+  $savings_goals = active_savings_goals_for_funding_account(
+    $pdo_db,
+    $user_id,
+    $funding_account_id
+  );
+
 }
 
 require '_includes/header.php';
@@ -122,10 +135,9 @@ require '_includes/nav.php';
     <?php } ?>
 
     <?php if ($funding_account): ?>
-      <div class="success" style="display:block;">
+      <div class="success" style="display:inline-block;margin-right:20px;">
 
         <strong><?php echo htmlspecialchars((string)$funding_account['account_name'], ENT_QUOTES, 'UTF-8'); ?></strong><a class="bd-smtxt" href="billing_projection.php?account=<?php echo urlencode((string)$funding_account['account_name']); ?>">Projection</a>
-
 
         <?php if (!empty($funding_account['login_url'])): ?>
           <a class="bd-smtxt" href="<?php echo htmlspecialchars((string)$funding_account['login_url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener noreferrer">
@@ -133,18 +145,149 @@ require '_includes/nav.php';
           </a>
         <?php endif; ?>
 
+        <br>Current Ledger Balance: $<?php echo number_format((float)$funding_summary['actual_balance'], 2); ?>
+        <br>Savings Goals: -$<?php echo number_format((float)$funding_summary['savings_goal_total'], 2); ?>
+        <br>Available for Bills: $<?php echo number_format((float)$funding_summary['available_for_bills'], 2); ?>
 
-
-
-        <br>Current Ledger Balance: $<?php echo number_format($current_balance, 2); ?>
+        <?php if ((float)$funding_summary['savings_goal_total'] > 0): ?>
+          <br><br><p>
+            Savings goals are still included in this funding account’s actual balance,
+            but are excluded from bill projections.
+          </p>
+        <?php endif; ?>
 
         <br><a class="w-lnk" href="reserve_adjustment.php?funding_account_id=<?php echo $funding_account_id; ?>">
           Adjust Balance
         </a>
 
+      </div> 
 
-      
+
+
+
+<?php /*
+      <div class="success">
+     
+        Bill Availability<br>
+
+        Actual Balance: $<?php echo number_format((float)$funding_summary['actual_balance'], 2) . '<br>'; ?>
+
+        Savings Goals: -$<?php echo number_format((float)$funding_summary['savings_goal_total'], 2) . '<br>'; ?>
+
+        Available for Bills: $<?php echo number_format((float)$funding_summary['available_for_bills'], 2); ?>
+
+        <?php if ((float)$funding_summary['savings_goal_total'] > 0): ?>
+          <p>
+            Savings goals are still included in this funding account’s actual balance,
+            but are excluded from bill projections.
+          </p>
+        <?php endif; ?>
+
       </div>
+*/ ?>
+
+
+<h2>Savings Goals</h2>
+
+<p>
+  <a href="add_savings_goal.php?funding_account_id=<?php echo (int)$funding_account_id; ?>">
+    Add Savings Goal
+  </a>
+</p>
+
+<?php if (!$savings_goals): ?>
+
+  <p>No active savings goals for this funding account.</p>
+
+<?php else: ?>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Goal</th>
+        <th>Saved</th>
+        <th>Target</th>
+        <th>Remaining</th>
+        <th>Progress</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <?php foreach ($savings_goals as $goal): ?>
+        <?php
+        $current_amount = round((float)$goal['current_amount'], 2);
+        $target_amount = round((float)$goal['target_amount'], 2);
+        $remaining_amount = max(0, $target_amount - $current_amount);
+
+        $progress_percent = 0;
+
+        if ($target_amount > 0) {
+          $progress_percent = min(
+            100,
+            round(($current_amount / $target_amount) * 100)
+          );
+        }
+        ?>
+
+        <tr>
+          <td>
+            <strong>
+              <?php echo htmlspecialchars((string)$goal['goal_name'], ENT_QUOTES, 'UTF-8'); ?>
+            </strong>
+
+            <?php if (!empty($goal['note'])): ?>
+              <br>
+              <small>
+                <?php echo htmlspecialchars((string)$goal['note'], ENT_QUOTES, 'UTF-8'); ?>
+              </small>
+            <?php endif; ?>
+          </td>
+
+          <td>
+            $<?php echo number_format($current_amount, 2); ?>
+          </td>
+
+          <td>
+            $<?php echo number_format($target_amount, 2); ?>
+          </td>
+
+          <td>
+            $<?php echo number_format($remaining_amount, 2); ?>
+          </td>
+
+          <td>
+            <?php echo (int)$progress_percent; ?>%
+          </td>
+
+          <td>
+            <a href="add_savings_goal_transaction.php?savings_goal_id=<?php echo (int)$goal['savings_goal_id']; ?>&type=contribution">
+              Add Funds
+            </a>
+
+            &nbsp;|&nbsp;
+
+            <a href="add_savings_goal_transaction.php?savings_goal_id=<?php echo (int)$goal['savings_goal_id']; ?>&type=release">
+              Release
+            </a>
+
+            &nbsp;|&nbsp;
+
+            <a href="add_savings_goal_transaction.php?savings_goal_id=<?php echo (int)$goal['savings_goal_id']; ?>&type=spend">
+              Mark Spent
+            </a>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+
+<?php endif; ?>
+
+
+
+
+
 
       <?php if ($ledger_rows): ?>
         <table>

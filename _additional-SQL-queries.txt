@@ -1,0 +1,53 @@
+CREATE TABLE funding_account_savings_goals (
+  savings_goal_id INT AUTO_INCREMENT PRIMARY KEY,
+  funding_account_id INT NOT NULL,
+  user_id INT NOT NULL,
+  goal_name VARCHAR(150) NOT NULL,
+  target_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  note TEXT NULL,
+  status ENUM('active', 'released', 'completed', 'archived') NOT NULL DEFAULT 'active',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL,
+  released_at DATETIME NULL,
+  completed_at DATETIME NULL,
+
+  INDEX idx_savings_goals_account_status (
+    funding_account_id,
+    user_id,
+    status
+  )
+);
+
+CREATE TABLE funding_account_savings_goal_transactions (
+  savings_goal_transaction_id INT AUTO_INCREMENT PRIMARY KEY,
+  savings_goal_id INT NOT NULL,
+  funding_account_id INT NOT NULL,
+  user_id INT NOT NULL,
+  transaction_type ENUM('contribution', 'release', 'spend', 'adjustment') NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  transaction_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  note TEXT NULL,
+
+  INDEX idx_savings_goal_transactions_goal (
+    savings_goal_id,
+    transaction_date
+  ),
+
+  INDEX idx_savings_goal_transactions_account (
+    funding_account_id,
+    user_id,
+    transaction_date
+  )
+);
+
+ALTER TABLE funding_account_savings_goal_transactions
+ADD COLUMN source_type ENUM('pool_deduction', 'new_deposit') NOT NULL DEFAULT 'pool_deduction'
+AFTER transaction_type;
+
+
+
+
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
